@@ -31,7 +31,7 @@ public partial class PanelWindow : Window
         InitializeComponent();
         SourceInitialized += (_, _) => Native.MakeToolWindow(new WindowInteropHelper(this).Handle);
         Closing += OnClosing;
-        geometryTimer.Tick += (_, _) => { if (IsVisible && !motionActive) Position(); };
+        geometryTimer.Tick += (_, _) => { if (IsVisible && !motionActive && !resizeActive) Position(); };
         geometryTimer.Start();
         cached = App.IsSmoke ? null : LocalStore.ReadCache(App.Settings.ServerUrl);
         if (cached != null)
@@ -40,9 +40,14 @@ public partial class PanelWindow : Window
             Status("显示上次保存的座位表，打开时自动刷新", false);
         }
     }
-    public void Toggle() { if (IsVisible && !closing) Collapse(); else Open(); }
+    public void Toggle()
+    {
+        if (resizeActive) { pendingCollapse = !pendingCollapse; return; }
+        if (IsVisible && !closing) Collapse(); else Open();
+    }
     public void Open()
     {
+        if (resizeActive) { pendingCollapse = false; return; }
         if (IsVisible && !closing) { _ = Refresh(); return; }
         closing = false;
         Position();
@@ -56,20 +61,23 @@ public partial class PanelWindow : Window
         }
         AnimateMotion(true);
     }
-    private void Position()
+    private void Position(bool force = false)
     {
-        var work = SystemParameters.WorkArea;
-        if (App.IsSmoke && App.CompactSmoke) work = new Rect(work.Right - 1366, work.Top, 1366, 720);
-        var edgeGap = Math.Clamp(Math.Min(work.Width, work.Height) * 0.02, 12, 24);
-        var availableWidth = Math.Max(1, work.Width - edgeGap * 2);
-        MinWidth = Math.Min(480, availableWidth);
-        Width = expanded ? availableWidth : Math.Clamp(App.Settings.PanelWidth, MinWidth, Math.Max(MinWidth, availableWidth * 0.72));
-        Height = expanded ? Math.Max(1, work.Height - edgeGap * 2) : Math.Min(720, work.Height * 0.80);
-        Top = work.Top + (work.Height - Height) / 2;
-        // Keep a gap for the launcher so its second click can always collapse the panel.
-        Left = work.Right - Width - Math.Max(edgeGap, expanded ? edgeGap : 36);
-        PanelSurface.CornerRadius = new CornerRadius(Math.Clamp(Math.Min(work.Width, work.Height) * 0.018, 12, 24));
+        if (resizeActive && !force) return;
+        var rect = WindowBounds(expanded);
+        // A layered HWND must not resize during a transition: DWM can briefly expose
+        // its previous surface. Keep the transparent host fixed and place the card inside it.
+        var work = WorkArea();
+        MinWidth = Math.Min(480, work.Width);
+        Width = work.Width; Height = work.Height; Left = work.Left; Top = work.Top;
+        MotionRoot.Width = rect.Width; MotionRoot.Height = rect.Height;
+        MotionRoot.HorizontalAlignment = HorizontalAlignment.Left;
+        MotionRoot.VerticalAlignment = VerticalAlignment.Top;
+        MotionRoot.Margin = new Thickness(rect.Left - work.Left, rect.Top - work.Top, 0, 0);
+        PanelSurface.Margin = expanded ? new Thickness(0) : new Thickness(10);
+        PanelSurface.CornerRadius = new CornerRadius(expanded ? 0 : FloatingRadius());
         PanelShadow.CornerRadius = PanelSurface.CornerRadius;
+        PanelShadow.Visibility = expanded ? Visibility.Collapsed : Visibility.Visible;
     }
     private void AnimateMotion(bool opening)
     {
@@ -129,6 +137,7 @@ public partial class PanelWindow : Window
     }
     public void Collapse()
     {
+        if (resizeActive) { pendingCollapse = true; return; }
         if (!IsVisible || closing) return;
         closing = true;
         AnimateMotion(false);
@@ -144,7 +153,7 @@ public partial class PanelWindow : Window
         {
             var result = await SeatApi.Fetch(source);
             if (source != App.Settings.ServerUrl) return;
-            while (motionActive) await Task.Delay(25);
+            while (motionActive || resizeActive) await Task.Delay(25);
             if (source != App.Settings.ServerUrl) return;
             var changed = cached == null || JsonSerializer.Serialize(cached.Plan, LocalStore.Json) != JsonSerializer.Serialize(result.Plan, LocalStore.Json);
             cached = result;
@@ -236,7 +245,7 @@ public partial class PanelWindow : Window
     }
     private void ApplyFit()
     {
-        if (!fit || boardWidth <= 0 || BoardScroll.ActualWidth <= 0) return;
+        if ((resizeActive && !handoffActive) || !fit || boardWidth <= 0 || BoardScroll.ActualWidth <= 0) return;
         var scale = Math.Clamp(Math.Min((BoardScroll.ActualWidth - 20) / boardWidth, (BoardScroll.ActualHeight - 20) / boardHeight), 0.25, 1.3);
         BoardScale.ScaleX = BoardScale.ScaleY = scale;
     }
@@ -249,6 +258,7 @@ public partial class PanelWindow : Window
             cached = LocalStore.ReadCache(App.Settings.ServerUrl);
             if (cached != null) Render(cached.Plan);
             else { Board.Children.Clear(); PlanTitle.Text = "座位表"; PlanStats.Text = "连接你的班级，随时查看座位"; EmptyState.Visibility = Visibility.Visible; EmptyTitle.Text = "正在获取座位表…"; UpdatedLabel.Text = ""; }
+            if (resizeActive) FinishExpansion(immediate: true);
             Position();
             await Refresh();
         };
@@ -267,7 +277,7 @@ public partial class PanelWindow : Window
     private void FitClick(object sender, RoutedEventArgs e) { fit = true; ApplyFit(); }
     private void ZoomOutClick(object sender, RoutedEventArgs e) { fit = false; BoardScale.ScaleX = BoardScale.ScaleY = Math.Clamp(BoardScale.ScaleX / 1.15, .25, 2); }
     private void ZoomInClick(object sender, RoutedEventArgs e) { fit = false; BoardScale.ScaleX = BoardScale.ScaleY = Math.Clamp(BoardScale.ScaleX * 1.15, .25, 2); }
-    private void ExpandClick(object sender, RoutedEventArgs e) { expanded = !expanded; ((Button)sender).Content = expanded ? "还原" : "展开"; Position(); }
+    private void ExpandClick(object sender, RoutedEventArgs e) => ToggleExpansion();
     private void BoardSizeChanged(object sender, SizeChangedEventArgs e) => ApplyFit();
     private void SettingsClick(object sender, RoutedEventArgs e) => ShowSettings();
     private void ManageClick(object sender, RoutedEventArgs e)
@@ -328,7 +338,9 @@ public partial class PanelWindow : Window
             { loaded = cached != null, rows = cached?.Plan.Rows, columns = cached?.Plan.Columns, cards = cached?.Plan.Seats.Count,
               scale = BoardScale.ScaleX, width = ActualWidth, height = ActualHeight, cornerRadius = PanelSurface.CornerRadius.TopLeft, status = ConnectionStatus.Text }, LocalStore.Json));
             var settings = new SettingsWindow();
-            settings.Show(); settings.UpdateLayout();
+            settings.Show();
+            await settings.VerifyConnectionForSmoke();
+            settings.UpdateLayout();
             var settingsBitmap = new RenderTargetBitmap((int)settings.ActualWidth, (int)settings.ActualHeight, 96, 96, PixelFormats.Pbgra32);
             settingsBitmap.Render(settings);
             var settingsEncoder = new PngBitmapEncoder(); settingsEncoder.Frames.Add(BitmapFrame.Create(settingsBitmap));

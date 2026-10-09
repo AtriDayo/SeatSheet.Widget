@@ -2,3 +2,7 @@ bin/
 obj/
 artifacts/
 *.user
+.env
+.env.*
+settings.json
+cache.json
