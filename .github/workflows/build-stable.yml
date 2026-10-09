@@ -1,0 +1,72 @@
+name: Build stable Windows exe
+
+on:
+  push:
+    branches: [stable]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    if: github.ref == 'refs/heads/stable'
+    runs-on: windows-2022
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      DOTNET_NOLOGO: 'true'
+      DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up .NET 8 SDK
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Run core checks
+        run: dotnet run --project tests/Widget.Checks.csproj -c Release
+
+      - name: Publish self-contained single exe
+        run: >-
+          dotnet publish SeatSheet.Widget.csproj
+          -c Release -r win-x64 --self-contained true
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:PublishTrimmed=false
+          -p:DebugType=None -p:DebugSymbols=false
+          -o artifacts/win-x64
+
+      - name: Verify package
+        run: |
+          $packageFiles = @(Get-ChildItem -LiteralPath artifacts/win-x64 -Recurse -File)
+          if ($packageFiles.Count -ne 1 -or $packageFiles[0].Name -ne 'SeatSheet.Widget.exe') {
+            throw 'Expected exactly one SeatSheet.Widget.exe in the publish output.'
+          }
+          $packageHash = (Get-FileHash -LiteralPath $packageFiles[0].FullName -Algorithm SHA256).Hash
+          "Windows x64, self-contained single EXE. No separate .NET installation required." >> $env:GITHUB_STEP_SUMMARY
+          "" >> $env:GITHUB_STEP_SUMMARY
+          "Commit: $env:GITHUB_SHA" >> $env:GITHUB_STEP_SUMMARY
+          "" >> $env:GITHUB_STEP_SUMMARY
+          "SHA256: $packageHash" >> $env:GITHUB_STEP_SUMMARY
+
+      - name: Upload Actions artifact
+        id: upload
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: SeatSheet.Widget-win-x64-${{ github.run_number }}
+          path: artifacts/win-x64/SeatSheet.Widget.exe
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Add download link
+        env:
+          ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
+        run: |
+          "" >> $env:GITHUB_STEP_SUMMARY
+          "[Download Windows x64 EXE (ZIP)]($env:ARTIFACT_URL) · retained for 30 days." >> $env:GITHUB_STEP_SUMMARY

@@ -13,7 +13,9 @@
 
 ## 获取与运行
 
-项目目前为预览版，仓库提供源码，尚未发布可直接下载的安装包或单 EXE。后续成品将通过 [Releases](https://github.com/AtriDayo/SeatSheet.Widget/releases) 提供。
+项目目前为预览版。每次更新 `stable` 分支后，会自动构建 Windows x64 单 EXE，并保存在 [GitHub Actions](https://github.com/AtriDayo/SeatSheet.Widget/actions/workflows/build-stable.yml) 的产物中，不创建 GitHub Release。
+
+下载步骤：登录 GitHub，打开最近一次成功的 `stable` 构建，在页面底部 **Artifacts** 中下载 `SeatSheet.Widget-win-x64-编号`。解压 ZIP 后运行 `SeatSheet.Widget.exe` 即可，无需另外安装 .NET。产物保留 30 天；这里提供的是程序文件，不是安装器。
 
 如果你已经拿到完整的程序文件夹，打开其中的 `SeatSheet.Widget.exe` 即可。请保留同目录下的其他文件；当前普通编译版本需要安装 **.NET 8 桌面运行时**，自带运行时的发布版本则不需要另外安装 .NET。
 
@@ -74,10 +76,10 @@ cd SeatSheet.Widget
 dotnet run -- --open
 ```
 
-生成自带运行时的 Windows x64 程序文件夹：
+生成与 Actions 一致的自带运行时 Windows x64 单 EXE：
 
 ```powershell
-dotnet publish -c Release -r win-x64 --self-contained true -o artifacts\win-x64
+dotnet publish SeatSheet.Widget.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishTrimmed=false -p:DebugType=None -p:DebugSymbols=false -o artifacts\win-x64
 ```
 
-将 `artifacts\win-x64` 整个文件夹一起分发。该命令生成的是文件夹版本，并非单 EXE。
+产物为 `artifacts\win-x64\SeatSheet.Widget.exe`。自动构建仅在 `stable` 分支更新时触发，也可以在 Actions 页面选择 `stable` 手动运行。
