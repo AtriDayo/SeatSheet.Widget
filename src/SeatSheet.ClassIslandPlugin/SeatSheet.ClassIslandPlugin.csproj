@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <Version>0.1.1</Version>
+    <CreateCipx>false</CreateCipx>
+    <NuGetLockFilePath>packages.lock.json</NuGetLockFilePath>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="ClassIsland.PluginSdk" Version="2.1.0.1" ExcludeAssets="runtime;native" />
+    <ProjectReference Include="../SeatSheet.RollCall.Protocol/SeatSheet.RollCall.Protocol.csproj" />
+    <None Update="manifest.yml;README.md" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../SeatSheet.Widget/Assets/app-icon.png" Link="icon.png" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <!-- Package an explicit allowlist; shared host assemblies must resolve from ClassIsland. -->
+  <Target Name="PackageSeatSheetPlugin" AfterTargets="Build" Condition="'$(PackagePlugin)' == 'true'">
+    <PropertyGroup>
+      <SeatSheetPackageStaging>$(IntermediateOutputPath)plugin-package/</SeatSheetPackageStaging>
+      <SeatSheetPackageOutput>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)/../../artifacts/plugin'))</SeatSheetPackageOutput>
+    </PropertyGroup>
+    <ItemGroup>
+      <SeatSheetPackageFile Include="$(TargetPath);$(TargetDir)SeatSheet.RollCall.Protocol.dll;$(TargetDir)$(AssemblyName).deps.json;$(TargetDir)manifest.yml;$(TargetDir)README.md;$(TargetDir)icon.png" />
+    </ItemGroup>
+    <Error Condition="!Exists('%(SeatSheetPackageFile.Identity)')" Text="Missing plugin package file: %(SeatSheetPackageFile.Identity)" />
+    <RemoveDir Directories="$(SeatSheetPackageStaging)" />
+    <MakeDir Directories="$(SeatSheetPackageStaging);$(SeatSheetPackageOutput)" />
+    <Copy SourceFiles="@(SeatSheetPackageFile)" DestinationFolder="$(SeatSheetPackageStaging)" />
+    <ZipDirectory SourceDirectory="$(SeatSheetPackageStaging)" DestinationFile="$(SeatSheetPackageOutput)/$(AssemblyName).cipx" Overwrite="true" />
+    <Message Text="Plugin package: $(SeatSheetPackageOutput)/$(AssemblyName).cipx" Importance="high" />
+  </Target>
+</Project>

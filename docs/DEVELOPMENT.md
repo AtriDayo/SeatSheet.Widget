@@ -5,11 +5,14 @@
 ```text
 SeatSheet.Widget.sln                     解决方案
 src/SeatSheet.Widget/                    桌面项目与资源
-src/SeatSheet.ClassIslandPlugin/         插件预留目录，尚无项目
+src/SeatSheet.ClassIslandPlugin/         ClassIsland 2.1.0.1 点名接收插件
+src/SeatSheet.RollCall.Protocol/         共享点名消息协议
 tests/SeatSheet.Widget.Checks/           核心检查
+tests/SeatSheet.ClassIslandPlugin.Checks/ 插件协议、去重与官方 IPC 检查
 dev/                                    开发、发布与资源转换脚本
 .github/workflows/                      自动构建
 artifacts/widget/win-x64/                桌面发布输出（不提交）
+artifacts/plugin/                       独立插件包（不提交）
 ```
 
 ## 编译、运行与检查
@@ -40,7 +43,14 @@ pwsh -File dev/publish-widget.ps1
 
 自动 workflow 仅由 `stable` 的推送触发，或手动选择 `stable` 运行，只上传 Actions 产物，不创建 Release。日常改动默认提交到 `main`，需要生成稳定版产物时再将经过确认的改动同步到 `stable`。
 
-插件目录暂不参与解决方案或构建。后续添加插件时应明确指定插件项目，将发布产物放到 `artifacts/plugin/`，不要对整个解决方案执行单 EXE 发布。
+插件已加入解决方案，但桌面发布脚本和 workflow 仍仅发布桌面项目。插件单独编译、打包：
+
+```powershell
+dotnet run --project tests/SeatSheet.ClassIslandPlugin.Checks -c Release
+dotnet build src/SeatSheet.ClassIslandPlugin -c Release -p:PackagePlugin=true
+```
+
+产物为 `artifacts/plugin/SeatSheet.ClassIslandPlugin.cipx`。无需额外 .NET 工作负载，插件用 `net8.0` / Avalonia。不要对整个解决方案执行单 EXE 发布，也不要将插件混入桌面发布目录。安装后可从 ClassIsland“SeatSheet 点名”设置页点击“测试提醒”。详见 [插件说明](CLASSISLAND-PLUGIN.md)。
 
 ## 开发辅助脚本
 

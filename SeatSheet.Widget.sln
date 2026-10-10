@@ -11,6 +11,12 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{87B73A2C
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SeatSheet.Widget.Checks", "tests\SeatSheet.Widget.Checks\SeatSheet.Widget.Checks.csproj", "{803FEFEC-E542-41DD-93AD-D677939EEA66}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SeatSheet.RollCall.Protocol", "src\SeatSheet.RollCall.Protocol\SeatSheet.RollCall.Protocol.csproj", "{5087665B-39E3-4604-9B74-8E89B815C255}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SeatSheet.ClassIslandPlugin", "src\SeatSheet.ClassIslandPlugin\SeatSheet.ClassIslandPlugin.csproj", "{0D1E71A7-A750-41D0-A614-1B39A23348E5}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SeatSheet.ClassIslandPlugin.Checks", "tests\SeatSheet.ClassIslandPlugin.Checks\SeatSheet.ClassIslandPlugin.Checks.csproj", "{B5B60A75-0F61-439E-9E50-931C8A3972C6}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -28,9 +34,24 @@ Global
 		{803FEFEC-E542-41DD-93AD-D677939EEA66}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{803FEFEC-E542-41DD-93AD-D677939EEA66}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{803FEFEC-E542-41DD-93AD-D677939EEA66}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5087665B-39E3-4604-9B74-8E89B815C255}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5087665B-39E3-4604-9B74-8E89B815C255}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5087665B-39E3-4604-9B74-8E89B815C255}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5087665B-39E3-4604-9B74-8E89B815C255}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0D1E71A7-A750-41D0-A614-1B39A23348E5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0D1E71A7-A750-41D0-A614-1B39A23348E5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0D1E71A7-A750-41D0-A614-1B39A23348E5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0D1E71A7-A750-41D0-A614-1B39A23348E5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B5B60A75-0F61-439E-9E50-931C8A3972C6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B5B60A75-0F61-439E-9E50-931C8A3972C6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B5B60A75-0F61-439E-9E50-931C8A3972C6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B5B60A75-0F61-439E-9E50-931C8A3972C6}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{364390A8-A51A-4C8A-842D-BE5925DDADA3} = {6DEB1D49-39B1-4F5E-850C-BE08A5AC8733}
 		{803FEFEC-E542-41DD-93AD-D677939EEA66} = {87B73A2C-E2D9-4F1E-ABA7-546DC438FFB4}
+		{5087665B-39E3-4604-9B74-8E89B815C255} = {6DEB1D49-39B1-4F5E-850C-BE08A5AC8733}
+		{0D1E71A7-A750-41D0-A614-1B39A23348E5} = {6DEB1D49-39B1-4F5E-850C-BE08A5AC8733}
+		{B5B60A75-0F61-439E-9E50-931C8A3972C6} = {87B73A2C-E2D9-4F1E-ABA7-546DC438FFB4}
 	EndGlobalSection
 EndGlobal
