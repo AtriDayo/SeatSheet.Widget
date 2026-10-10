@@ -13,6 +13,11 @@ public partial class SettingsWindow : Window
         InitializeComponent();
         Address.Text = App.Settings.ServerUrl;
         PanelWidth.Value = App.Settings.PanelWidth;
+        Height = Math.Min(850, Math.Max(360, SystemParameters.WorkArea.Height - 48));
+        var kind = LauncherStyles.Normalize(App.Settings.LauncherStyle);
+        LabelOption.IsChecked = kind == LauncherStyles.Label;
+        SlimOption.IsChecked = kind == LauncherStyles.Slim;
+        ArrowOption.IsChecked = kind == LauncherStyles.Arrow;
         Closed += (_, _) => closed = true;
     }
     private async void SaveClick(object sender, RoutedEventArgs e) => await CheckConnection(true);
@@ -20,6 +25,7 @@ public partial class SettingsWindow : Window
     private async Task CheckConnection(bool save)
     {
         SaveButton.IsEnabled = TestButton.IsEnabled = Address.IsEnabled = PanelWidth.IsEnabled = CancelButton.IsEnabled = false;
+        HandleOptions.IsEnabled = false;
         ConnectionProgress.Visibility = Visibility.Visible;
         ConnectionState.Text = "正在连接…";
         ConnectionState.Foreground = (System.Windows.Media.Brush)FindResource("Muted");
@@ -27,20 +33,26 @@ public partial class SettingsWindow : Window
         try
         {
             var source = SeatApi.Normalize(Address.Text);
-            var result = await SeatApi.Fetch(source);
+            // Keep appearance changes available offline; a new endpoint must validate first.
+            var result = !save || source != App.Settings.ServerUrl ? await SeatApi.Fetch(source) : null;
             if (closed) return;
             Address.Text = source;
-            ConnectionState.Text = "连接成功";
-            ConnectionState.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(36, 104, 73));
-            Message.Text = $"{result.Plan.Name} · {result.Plan.Rows} 排 × {result.Plan.Columns} 列";
+            if (result != null)
+            {
+                ConnectionState.Text = "连接成功";
+                ConnectionState.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(36, 104, 73));
+                Message.Text = $"{result.Plan.Name} · {result.Plan.Rows} 排 × {result.Plan.Columns} 列";
+            }
             if (!save) return;
             var oldSource = App.Settings.ServerUrl;
             var oldWidth = App.Settings.PanelWidth;
+            var oldStyle = App.Settings.LauncherStyle;
             App.Settings.ServerUrl = source;
             App.Settings.PanelWidth = PanelWidth.Value;
+            App.Settings.LauncherStyle = SlimOption.IsChecked == true ? LauncherStyles.Slim : ArrowOption.IsChecked == true ? LauncherStyles.Arrow : LauncherStyles.Label;
             try { LocalStore.SaveSettings(); }
-            catch { App.Settings.ServerUrl = oldSource; App.Settings.PanelWidth = oldWidth; throw; }
-            try { LocalStore.SaveCache(result); } catch { /* The live connection remains usable. */ }
+            catch { App.Settings.ServerUrl = oldSource; App.Settings.PanelWidth = oldWidth; App.Settings.LauncherStyle = oldStyle; throw; }
+            if (result != null) try { LocalStore.SaveCache(result); } catch { /* The live connection remains usable. */ }
             Saved?.Invoke(this, EventArgs.Empty);
             Close();
         }
@@ -59,6 +71,7 @@ public partial class SettingsWindow : Window
         finally
         {
             SaveButton.IsEnabled = TestButton.IsEnabled = Address.IsEnabled = PanelWidth.IsEnabled = CancelButton.IsEnabled = true;
+            HandleOptions.IsEnabled = true;
             ConnectionProgress.Visibility = Visibility.Collapsed;
         }
     }
@@ -74,6 +87,28 @@ public partial class SettingsWindow : Window
         WidthHint.Text = $"当前屏幕显示宽度约 {actual:0}，会自动限制以留出桌面空间。展开模式不受此设置影响。";
     }
     private void CancelClick(object sender, RoutedEventArgs e) => Close();
+    internal void VerifyCancelForSmoke()
+    {
+        var kind = App.Settings.LauncherStyle;
+        var width = App.Settings.PanelWidth;
+        ArrowOption.IsChecked = true;
+        PanelWidth.Value = width + 20;
+        Close();
+        if (kind != App.Settings.LauncherStyle || width != App.Settings.PanelWidth)
+            throw new InvalidOperationException("Cancel changed the active appearance settings.");
+    }
+    internal async Task VerifyAppearanceForSmoke(string kind)
+    {
+        if (!App.IsSmoke) throw new InvalidOperationException("Appearance verification requires isolated smoke mode.");
+        LabelOption.IsChecked = kind == LauncherStyles.Label;
+        SlimOption.IsChecked = kind == LauncherStyles.Slim;
+        ArrowOption.IsChecked = kind == LauncherStyles.Arrow;
+        var saved = false;
+        Saved += (_, _) => saved = true;
+        await CheckConnection(true);
+        if (!saved || App.Settings.LauncherStyle != kind)
+            throw new InvalidOperationException("Could not save the selected handle style while offline.");
+    }
     internal async Task VerifyConnectionForSmoke()
     {
         var source = App.Settings.ServerUrl;

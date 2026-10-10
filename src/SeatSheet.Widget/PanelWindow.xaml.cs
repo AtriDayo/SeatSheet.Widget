@@ -19,6 +19,7 @@ namespace SeatSheet.Widget;
 
 public partial class PanelWindow : Window
 {
+    public event EventHandler? SettingsSaved;
     private CachedPlan? cached;
     private bool loading, expanded, fit = true, closing;
     private SettingsWindow? settingsWindow;
@@ -255,6 +256,7 @@ public partial class PanelWindow : Window
         settingsWindow = new SettingsWindow();
         settingsWindow.Saved += async (_, _) =>
         {
+            SettingsSaved?.Invoke(this, EventArgs.Empty);
             cached = LocalStore.ReadCache(App.Settings.ServerUrl);
             if (cached != null) Render(cached.Plan);
             else { Board.Children.Clear(); PlanTitle.Text = "座位表"; PlanStats.Text = "连接你的班级，随时查看座位"; EmptyState.Visibility = Visibility.Visible; EmptyTitle.Text = "正在获取座位表…"; UpdatedLabel.Text = ""; }

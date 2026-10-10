@@ -18,9 +18,17 @@ public partial class LauncherWindow : Window
         InitializeComponent();
         this.panel = panel;
         SourceInitialized += (_, _) => Native.MakeToolWindow(new WindowInteropHelper(this).Handle);
-        Loaded += (_, _) => Position();
+        Loaded += (_, _) => ApplyAppearance();
+        panel.SettingsSaved += (_, _) => ApplyAppearance();
+        ApplyAppearance();
         positionTimer.Tick += (_, _) => { if (!pressed) Position(); };
         positionTimer.Start();
+    }
+    internal void ApplyAppearance()
+    {
+        HandleVisual.Kind = App.Settings.LauncherStyle;
+        Width = HandleVisual.Width; Height = HandleVisual.Height;
+        Position();
     }
     private void Position()
     {

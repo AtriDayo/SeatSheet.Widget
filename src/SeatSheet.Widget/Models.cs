@@ -39,6 +39,12 @@ public sealed class WidgetSettings
     public string ServerUrl { get; set; } = "http://localhost:5173";
     public double ButtonTopRatio { get; set; } = 0.42;
     public double PanelWidth { get; set; } = 920;
+    public string LauncherStyle { get; set; } = LauncherStyles.Label;
+}
+public static class LauncherStyles
+{
+    public const string Label = "label", Slim = "slim", Arrow = "arrow";
+    public static string Normalize(string? value) => value is Slim or Arrow ? value : Label;
 }
 public sealed class CachedPlan
 {
@@ -58,6 +64,7 @@ internal static class LocalStore
             settings.ServerUrl = SeatApi.Normalize(settings.ServerUrl);
             settings.ButtonTopRatio = double.IsFinite(settings.ButtonTopRatio) ? Math.Clamp(settings.ButtonTopRatio, 0, 1) : 0.42;
             settings.PanelWidth = double.IsFinite(settings.PanelWidth) ? Math.Clamp(settings.PanelWidth, 480, 1800) : 920;
+            settings.LauncherStyle = LauncherStyles.Normalize(settings.LauncherStyle);
             return settings;
         }
         catch { return new(); }

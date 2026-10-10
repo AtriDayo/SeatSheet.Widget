@@ -23,9 +23,10 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        var appearanceQa = e.Args.Contains("--appearance-qa");
         IsExpansionQa = e.Args.Contains("--expand-qa");
         IsMotionQa = e.Args.Contains("--motion-qa") || IsExpansionQa;
-        IsSmoke = e.Args.Contains("--smoke") || IsMotionQa;
+        IsSmoke = e.Args.Contains("--smoke") || IsMotionQa || appearanceQa;
         CompactSmoke = e.Args.Contains("--compact");
         if (IsSmoke) SmokeFolder = Path.Combine(AppContext.BaseDirectory, "qa");
         mutex = new Mutex(true, IsSmoke ? "SeatSheet.Widget.Smoke" : "SeatSheet.Widget.Desktop", out var first);
@@ -49,7 +50,8 @@ public partial class App : Application
             tray.DoubleClick += (_, _) => Dispatcher.Invoke(() => panel.Open());
         }
         launcher.Show();
-        if (IsExpansionQa) _ = panel.CheckExpansion();
+        if (appearanceQa) _ = CheckAppearance();
+        else if (IsExpansionQa) _ = panel.CheckExpansion();
         else if (IsMotionQa) _ = panel.CheckMotion();
         else if (e.Args.Contains("--settings")) panel.ShowSettings();
         else if (IsSmoke || e.Args.Contains("--open")) panel.Open();

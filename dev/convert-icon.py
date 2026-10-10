@@ -3,7 +3,7 @@ from pathlib import Path
 from PIL import Image
 
 root = Path(__file__).resolve().parent.parent
-assets = root / "Assets"
+assets = root / "src" / "SeatSheet.Widget" / "Assets"
 sizes = (16, 20, 24, 32, 40, 48, 64, 96, 128, 256)
 with Image.open(assets / "app-icon-source.png") as original:
     image = original.convert("RGBA")

@@ -81,7 +81,8 @@ public partial class PanelWindow
         expanded = !expanded;
         resizeTo = CardBounds(expanded);
         radiusTo = expanded ? 0 : FloatingRadius();
-        ExpansionToggle.Content = ExpandButton.Content = expanded ? "还原" : "展开";
+        ExpansionToggle.Label = ExpandButton.Label = expanded ? "还原" : "展开";
+        ExpansionToggle.Icon = ExpandButton.Icon = expanded ? "restore" : "expand";
         var version = ++resizeVersion;
         BeginAnimation(ExpansionProgressProperty, null);
         ExpansionProgress = 0;

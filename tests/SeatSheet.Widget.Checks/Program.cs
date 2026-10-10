@@ -19,6 +19,10 @@ internal static class Program
     }
     public static async Task Main()
     {
+        Check(System.Text.Json.JsonSerializer.Deserialize<WidgetSettings>("{}")!.LauncherStyle == LauncherStyles.Label, "Legacy settings retain the labeled handle");
+        Check(LauncherStyles.Normalize("unknown") == LauncherStyles.Label, "Unknown handle style falls back without discarding settings");
+        foreach (var style in new[] { LauncherStyles.Label, LauncherStyles.Slim, LauncherStyles.Arrow })
+            Check(System.Text.Json.JsonSerializer.Deserialize<WidgetSettings>(System.Text.Json.JsonSerializer.Serialize(new WidgetSettings { LauncherStyle = style }))!.LauncherStyle == style, "Persist handle style " + style);
         foreach (var suffix in new[] { "", "/", "/api", "/api/seat-plan", "/config" })
             Check(SeatApi.Normalize("https://example.com" + suffix) == "https://example.com", "Normalize " + suffix);
         Check(SeatApi.Normalize(" https://example.com/school/api ") == "https://example.com/school", "Keep deployment prefix");

@@ -5,6 +5,7 @@
 ## 功能
 
 - **一键查看**：点击右侧“座位”按钮弹出面板，再次点击即可收起；按钮可以上下拖动。
+- **三种把手**：在设置中选择“座位标签”“细长把手”或“门形箭头”，减少对教学内容的遮挡。
 - **灵活显示**：支持适应窗口、放大缩小，以及展开到整个桌面工作区。
 - **连接网站**：填写 SeatSheet 网站地址，测试连接成功后保存。
 - **离线查看**：网络不可用时，显示最近一次成功获取的座位表。
@@ -25,9 +26,9 @@
 
 1. 启动程序，在桌面右侧找到“座位”按钮。
 2. 右键按钮或托盘图标，选择“设置”。
-3. 填写平时查看座位表的网站地址，例如 `https://seats.atridayo.com`。首次运行预填的是本地开发地址，请换成你的实际网站地址。
+3. 填写你所在班级的 SeatSheet 网站地址。示例地址 `https://seats.example.com` 仅用于说明格式，请换成自己的实际地址；首次运行预填的是本地开发地址。
 4. 点击“测试连接”，确认显示正确的班级名称。
-5. 按需调整面板宽度，点击“连接并保存”。
+5. 按需选择把手样式、调整面板宽度，点击“保存设置”。只调整外观时可以离线保存；更换网站地址时会先验证连接。
 
 之后点击“座位”按钮即可查看。每次打开面板时会自动刷新，也可以点击“刷新”手动获取最新数据。
 
@@ -54,7 +55,7 @@
 %LOCALAPPDATA%\SeatSheet.Widget\
 ```
 
-- `settings.json`：网站地址、面板宽度和按钮位置。
+- `settings.json`：网站地址、面板宽度、把手样式和按钮位置。
 - `cache.json`：最近一次成功获取的座位表。
 
 可将上述路径粘贴到资源管理器地址栏打开。配置保存在程序文件夹之外，替换程序文件进行升级时通常可以继续使用原有设置。缓存中包含座位表内容。
@@ -73,13 +74,13 @@
 ```powershell
 git clone https://github.com/AtriDayo/SeatSheet.Widget.git
 cd SeatSheet.Widget
-dotnet run -- --open
+dotnet run --project src/SeatSheet.Widget -- --open
 ```
 
 生成与 Actions 一致的自带运行时 Windows x64 单 EXE：
 
 ```powershell
-dotnet publish SeatSheet.Widget.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishTrimmed=false -p:DebugType=None -p:DebugSymbols=false -o artifacts\win-x64
+pwsh -File dev/publish-widget.ps1
 ```
 
-产物为 `artifacts\win-x64\SeatSheet.Widget.exe`。自动构建仅在 `stable` 分支更新时触发，也可以在 Actions 页面选择 `stable` 手动运行。
+产物为 `artifacts\widget\win-x64\SeatSheet.Widget.exe`。自动构建仅在 `stable` 分支更新时触发，也可以在 Actions 页面选择 `stable` 手动运行。目录结构、测试与构建说明见 [开发文档](docs/DEVELOPMENT.md)。

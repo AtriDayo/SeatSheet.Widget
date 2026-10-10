@@ -9,6 +9,6 @@
     <RootNamespace>SeatSheet.Widget</RootNamespace>
     <ApplicationIcon>Assets/app.ico</ApplicationIcon>
   </PropertyGroup>
-  <ItemGroup><Compile Remove="tests/**/*.cs" /></ItemGroup>
   <ItemGroup><Resource Include="Assets/app-icon.png"/><Resource Include="Assets/app.ico"/></ItemGroup>
+  <ItemGroup><Resource Include="Assets/Icons/ui.svg"/></ItemGroup>
 </Project>
