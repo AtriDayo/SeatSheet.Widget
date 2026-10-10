@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Threading;
 using ClassIsland.Core.Abstractions.Controls;
 using ClassIsland.Core.Attributes;
 using ClassIsland.Core.Controls;
@@ -18,7 +19,7 @@ public sealed class RollCallSettingsPage : SettingsPageBase
 {
     private CancellationTokenSource? _pendingSave;
 
-    public RollCallSettingsPage(RollCallReceiver receiver, NotificationDisplaySettingsStore settings)
+    public RollCallSettingsPage(RollCallReceiver receiver, NotificationDisplaySettingsStore settings, ClientConnectionState connection)
     {
         var saveState = SmallText(settings.LoadFailed
             ? "原设置无法读取，已使用默认 5 秒；调整后将重新保存。"
@@ -37,6 +38,17 @@ public sealed class RollCallSettingsPage : SettingsPageBase
         };
         var testState = SmallText("显示虚构的示例同学、班级和座位，不会抽取真实学生。", 13);
         var readiness = new TextBlock { Text = receiver.Ready ? "已就绪" : "未就绪", VerticalAlignment = VerticalAlignment.Center };
+        var clientStatus = new TextBlock { VerticalAlignment = VerticalAlignment.Center };
+        void RefreshStatus()
+        {
+            readiness.Text = receiver.Ready ? "已就绪" : "未就绪";
+            clientStatus.Text = receiver.Ready && connection.Connected ? "已连接" : "未连接";
+        }
+        RefreshStatus();
+        // Refresh only while this page is visible; no background heartbeat polling.
+        var statusTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        statusTimer.Tick += (_, _) => RefreshStatus();
+        Loaded += (_, _) => { RefreshStatus(); statusTimer.Start(); };
         var test = new Button
         {
             Name = "TestNotification", Content = "测试提醒", MinWidth = 100,
@@ -84,6 +96,7 @@ public sealed class RollCallSettingsPage : SettingsPageBase
         };
         Unloaded += async (_, _) =>
         {
+            statusTimer.Stop();
             CancelPendingSave();
             await SaveAsync((int)Math.Round(slider.Value));
         };
@@ -130,12 +143,12 @@ public sealed class RollCallSettingsPage : SettingsPageBase
             Children =
             {
                 SmallText("在这里调整 ClassIsland 的显示效果。名单、抽取和点名规则由座位表软件管理。", 14),
-                Card("联动状态", "接收座位表软件已确定的点名结果。", 60871, readiness),
+                Card("接收服务", "插件已初始化，可接收点名结果；不代表客户端已连接。", 60871, readiness),
+                Card("客户端连接状态", "最近 30 秒内收到桌面端握手或有效结果时显示已连接。", 60871, clientStatus),
                 Card("通知显示时长", "结果显示的总时长，包含姓名提示和班级、座位正文。", 62305, durationControls),
                 new Border { Padding = new Thickness(16, 0, 16, 8), Child = saveState },
                 Card("测试提醒", "按当前显示时长预览一条示例通知。", 60857, test),
                 new Border { Padding = new Thickness(16, 0, 16, 8), Child = testState },
-                Card("音效与朗读", "沿用 ClassIsland 的提醒设置；姓名朗读一次，班级和座位只显示。", 59876, null),
                 new Border
                 {
                     Padding = new Thickness(16, 8),

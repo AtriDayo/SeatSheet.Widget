@@ -15,6 +15,8 @@ public sealed class Plugin : PluginBase
 {
     public override void Initialize(HostBuilderContext context, IServiceCollection services)
     {
+        SeatSheetNavigationIcon.Register();
+        services.AddSingleton<ClientConnectionState>();
         services.AddSingleton(new NotificationDisplaySettingsStore(Path.Combine(PluginConfigFolder, "notification.json")));
         services.AddNotificationProvider<RollCallNotificationProvider>();
         // Share the registered provider with the receiver, rather than construct a second provider.

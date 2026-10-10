@@ -10,11 +10,11 @@ public sealed class RollCallIpcService : IHostedService
     private readonly RollCallReceiver _receiver;
     private readonly ILogger<RollCallIpcService> _logger;
 
-    public RollCallIpcService(IIpcService ipc, RollCallReceiver receiver, ILogger<RollCallIpcService> logger)
+    public RollCallIpcService(IIpcService ipc, RollCallReceiver receiver, ILogger<RollCallIpcService> logger, ClientConnectionState connection)
     {
         _receiver = receiver;
         _logger = logger;
-        RollCallIpcRoutes.Register(ipc.JsonRoutedProvider, receiver);
+        RollCallIpcRoutes.Register(ipc.JsonRoutedProvider, receiver, connection);
     }
 
     public async Task StartAsync(CancellationToken cancellationToken)

@@ -4,12 +4,13 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <EnableDynamicLoading>true</EnableDynamicLoading>
-    <Version>0.1.1</Version>
+    <Version>0.1.5</Version>
     <CreateCipx>false</CreateCipx>
     <NuGetLockFilePath>packages.lock.json</NuGetLockFilePath>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   </PropertyGroup>
   <ItemGroup>
+    <EmbeddedResource Include="Assets/seatsheet-outline.svg" />
     <PackageReference Include="ClassIsland.PluginSdk" Version="2.1.0.1" ExcludeAssets="runtime;native" />
     <ProjectReference Include="../SeatSheet.RollCall.Protocol/SeatSheet.RollCall.Protocol.csproj" />
     <None Update="manifest.yml;README.md" CopyToOutputDirectory="PreserveNewest" />

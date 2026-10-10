@@ -168,20 +168,32 @@ var routes = new JsonIpcDirectRoutedProvider(server);
 var clientRoutes = new JsonIpcDirectRoutedProvider(client);
 var ipcSink = new TestSink();
 var ipcReceiver = new RollCallReceiver(ipcSink, new MemoryStore());
+var connectionClock = new ConnectionClock();
+var connection = new ClientConnectionState(connectionClock);
+Check(!connection.Connected, "Receiver initialization alone cannot mark a client connected");
 await ipcReceiver.InitializeAsync();
-RollCallIpcRoutes.Register(routes, ipcReceiver);
+RollCallIpcRoutes.Register(routes, ipcReceiver, connection);
 routes.StartServer();
 clientRoutes.StartServer();
 var proxy = await clientRoutes.GetAndConnectClientAsync(serverName).WaitAsync(TimeSpan.FromSeconds(5));
 var hello = await proxy.GetResponseAsync<RollCallHello>(RollCallProtocol.HelloRoute).WaitAsync(TimeSpan.FromSeconds(5));
 Check(hello is { Ready: true, ProtocolVersion: 1 } && hello.ReceiverInstanceId == ipcReceiver.InstanceId, "Official named pipe hello round-trip");
+Check(connection.Connected, "IPC handshake marks client activity");
+connectionClock.Elapsed = TimeSpan.FromSeconds(30);
+Check(!connection.Connected, "Client activity expires after 30 seconds without a heartbeat");
+await ipcReceiver.ReceiveAsync(Message(DateTimeOffset.UtcNow));
+Check(!connection.Connected, "Internal sample notifications never mark a client connected");
+ipcSink.Calls = 0;
 var ipcMessage = Message(DateTimeOffset.UtcNow);
 var ack = await proxy.GetResponseAsync<RollCallReceipt>(RollCallProtocol.NotifyRoute, ipcMessage).WaitAsync(TimeSpan.FromSeconds(5));
 Check(ack is { Status: "accepted" } && ack.MessageId == ipcMessage.MessageId && ipcSink.Calls == 1, "Official JSON result and receipt round-trip");
+Check(connection.Connected, "Valid IPC result renews client activity");
 var repeated = await proxy.GetResponseAsync<RollCallReceipt>(RollCallProtocol.NotifyRoute, ipcMessage).WaitAsync(TimeSpan.FromSeconds(5));
 Check(repeated is { Status: "duplicate" } && ipcSink.Calls == 1, "Transport retry cannot produce a second notification");
+connectionClock.Elapsed = TimeSpan.FromSeconds(60);
 var invalidAck = await proxy.GetResponseAsync<RollCallReceipt>(RollCallProtocol.NotifyRoute, ipcMessage with { ProtocolVersion = 2 }).WaitAsync(TimeSpan.FromSeconds(5));
 Check(invalidAck is { Status: "unsupportedVersion" }, "Protocol mismatch returns a business rejection");
+Check(!connection.Connected, "Rejected messages do not renew client activity");
 Console.WriteLine($"{checks} plugin checks passed.");
 
 sealed class TestClock(DateTimeOffset now) : TimeProvider
@@ -203,7 +215,7 @@ sealed class MemoryStore : IDedupStore
 }
 sealed class TestSink : IRollCallNotificationSink
 {
-    public int Calls { get; private set; }
+    public int Calls { get; set; }
     public bool Fail { get; init; }
     public TaskCompletionSource? Block { get; init; }
     public async Task SubmitAsync(RollCallMessage message)
@@ -212,4 +224,11 @@ sealed class TestSink : IRollCallNotificationSink
         if (Fail) throw new InvalidOperationException("Simulated submission failure.");
         if (Block is not null) await Block.Task;
     }
+}
+
+sealed class ConnectionClock : TimeProvider
+{
+    public TimeSpan Elapsed { get; set; }
+    public override long TimestampFrequency => TimeSpan.TicksPerSecond;
+    public override long GetTimestamp() => Elapsed.Ticks;
 }

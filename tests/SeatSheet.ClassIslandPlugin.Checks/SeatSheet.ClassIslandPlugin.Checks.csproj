@@ -10,6 +10,6 @@
     <PackageReference Include="dotnetCampus.Ipc" Version="2.0.0-alpha410" />
     <Compile Include="../../src/SeatSheet.ClassIslandPlugin/Reception/*.cs" Link="Reception/%(Filename)%(Extension)" />
     <Compile Include="../../src/SeatSheet.ClassIslandPlugin/Services/RollCallIpcRoutes.cs" Link="Services/RollCallIpcRoutes.cs" />
-    <Compile Include="../../src/SeatSheet.ClassIslandPlugin/Presentation/*.cs" Link="Presentation/%(Filename)%(Extension)" />
+    <Compile Include="../../src/SeatSheet.ClassIslandPlugin/Presentation/NotificationDisplaySettings.cs" Link="Presentation/NotificationDisplaySettings.cs" />
   </ItemGroup>
 </Project>

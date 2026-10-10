@@ -71,7 +71,7 @@ public sealed record RollCallHello
     [JsonProperty("protocolVersion"), JsonPropertyName("protocolVersion")]
     public int ProtocolVersion { get; init; } = RollCallProtocol.Version;
     [JsonProperty("pluginVersion"), JsonPropertyName("pluginVersion")]
-    public string PluginVersion { get; init; } = "0.1.1";
+    public string PluginVersion { get; init; } = "0.1.5";
     [JsonProperty("receiverInstanceId"), JsonPropertyName("receiverInstanceId")]
     public string ReceiverInstanceId { get; init; } = "";
     [JsonProperty("ready"), JsonPropertyName("ready")]

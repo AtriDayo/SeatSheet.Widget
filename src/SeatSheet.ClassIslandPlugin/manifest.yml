@@ -3,7 +3,7 @@ name: SeatSheet 点名
 description: 接收 SeatSheet 点名结果并通过 ClassIsland 原生提醒展示。
 entranceAssembly: SeatSheet.ClassIslandPlugin.dll
 apiVersion: 2.1.0.1
-version: 0.1.1.0
+version: 0.1.5.0
 author: SeatSheet
 url: https://github.com/AtriDayo/SeatSheet.Widget
 icon: icon.png
