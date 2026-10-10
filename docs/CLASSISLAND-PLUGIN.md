@@ -22,7 +22,7 @@ dotnet build src/SeatSheet.ClassIslandPlugin -c Release -p:PackagePlugin=true
 - 独立的原生提醒提供方，姓名朗读一次，班级、座位只显示；原生卡片设置页支持 2–30 秒显示时长，默认 5 秒，自动保存。
 - 插件设置页提供虚构数据的“测试提醒”按钮；此按钮直接验证接收与展示逻辑。
 - 真实官方命名管道收发由自动检查验证，使用随机私有管道和假的提醒出口，不连接日常 ClassIsland。
-- 暂未实现桌面随机点名、名单管理、权重、缺席排除或三种显示目标。
+- 桌面端已接入随机点名、权重、缺席排除与三种显示目标，参见 [桌面点名说明](ROLLCALL.md)。插件继续只负责结果通知。
 
 固定使用 `ClassIsland.PluginSdk 2.1.0.1`，其对应官方提交为 `15273f82c9d2d55929df83b5fb806e68ee4547c0`。宿主使用 `dotnetCampus.Ipc 2.0.0-alpha410`。插件项目提交 NuGet 锁文件以固定实际依赖，更新宿主兼容目标时需重新验证；不使用浮动 SDK 版本。
 
@@ -32,7 +32,7 @@ dotnet build src/SeatSheet.ClassIslandPlugin -c Release -p:PackagePlugin=true
 
 图标源文件为 `src/SeatSheet.ClassIslandPlugin/Assets/seatsheet-outline.svg`，讲台使用圆角胶囊轮廓，六个座椅使用圆弧靠背和圆头座面。SVG 嵌入插件 DLL，其路径只解析一次并缓存，不增加 SVG 渲染依赖；前景色继承宿主主题。
 
-设置页区分“接收服务”和“客户端连接状态”。前者仅反映接收端初始化与停用状态；后者根据官方 IPC 路由的握手或成功结果维护 30 秒活跃期限，使用单调时钟，过期显示未连接。桌面端未来需每 10 秒发送一次 `hello`；这不是操作系统管道句柄状态，也不是客户端身份认证。内部测试不更新连接状态。仅设置页可见时每秒刷新文字，关闭后停止刷新。
+设置页区分“接收服务”和“客户端连接状态”。前者仅反映接收端初始化与停用状态；后者根据官方 IPC 路由的握手或成功结果维护 30 秒活跃期限，使用单调时钟，过期显示未连接。桌面端选择外部通知时每 10 秒发送一次 `hello`；这不是操作系统管道句柄状态，也不是客户端身份认证。内部测试不更新连接状态。仅设置页可见时每秒刷新文字，关闭后停止刷新。
 
 侧栏图标使用与桌面标志相同的讲台和六个座位构图，以主题色线条显示。ClassIsland 2.1.0.1 的设置页元数据只支持字体图标，插件通过 Avalonia 导航项 Tag 事件替换自己的图标，不修改宿主文件或其他插件导航项。
 
@@ -40,7 +40,7 @@ dotnet build src/SeatSheet.ClassIslandPlugin -c Release -p:PackagePlugin=true
 
 其他插件的“持久化二级提醒”，从截图说明看应指姓名强调提示之后继续显示结果正文，并非将姓名保存到磁盘。本插件不提供此开关。名单、权重、缺席排除和显示目标由桌面软件管理。
 
-使用 ClassIsland 官方 `IIpcService.JsonRoutedProvider`，管道名由官方 `IpcClient.PipeName` 提供：`ClassIsland.IPC.v2.Server`。未来桌面软件使用 `ClassIsland.Shared.IPC 2.1.0.1` 建立连接，再通过 JSON 路由客户端请求以下路由：
+使用 ClassIsland 官方 `IIpcService.JsonRoutedProvider`，管道名由官方 `IpcClient.PipeName` 提供：`ClassIsland.IPC.v2.Server`。桌面软件使用 `ClassIsland.Shared.IPC 2.1.0.1` 建立连接，再通过 JSON 路由客户端请求以下路由：
 
 | 路由 | 请求 | 回应 |
 | --- | --- | --- |
@@ -85,7 +85,7 @@ dotnet build src/SeatSheet.ClassIslandPlugin -c Release -p:PackagePlugin=true
 
 `hello.ready = false` 时不要发送。管道连接失败意味着通信不可用；管道可连接但本插件路由无响应，可能是插件未安装、禁用或启动异常。不能仅凭超时认定 ClassIsland 没有运行。
 
-未来发送端应复用连接，设置连接与回执超时（建议各 1 秒），最多在有效期内重试一次。超时可能已经提交；重试只重发同一条消息。`accepted` 或 `duplicate` 后停止自动重试，`invalid`、`expired` 等业务拒绝不做盲目重试。接收端没有随机抽取接口。
+桌面发送端每次请求建立短连接，握手与回执共用约 3 秒总超时；选择外部通知时每 10 秒握手一次。当前不自动重试，用户可在结果窗口手动重发同一条消息。超时可能已经提交，重发不更改抽取结果、消息 ID 或有效期。`accepted`、`duplicate` 表示结果已提交或已保留，不保证实际播放；`invalid`、`expired` 等业务拒绝不应盲目重试。接收端没有随机抽取接口。
 
 ## 去重、性能与隐私
 
@@ -93,7 +93,7 @@ dotnet build src/SeatSheet.ClassIslandPlugin -c Release -p:PackagePlugin=true
 
 宿主分配的插件配置目录内保存 `dedup.json`，只包含消息 ID、SHA-256 指纹和保留期限，**不包含姓名、班级或座位**。保留期限是消息过期时间加 5 分钟。记录先原子写入磁盘，再提交提醒，覆盖重启后的重复消息。磁盘写入失败时停用接收；去重文件损坏时不自动覆盖，防止丢失记录后重播。停用状态请检查目录权限、磁盘和日志；如需清理损坏文件，请先退出 ClassIsland，并等待旧消息全部过期。
 
-采用优先避免重复的语义：记录完成到提醒提交之间崩溃，可能漏掉一次通知；没有保证“恰好显示一次”。提醒提交异常时也保留记录，重试不会再次播放。姓名结果应始终保留在未来桌面软件中，“抽取失败”和“发送失败”必须分别处理。
+采用优先避免重复的语义：记录完成到提醒提交之间崩溃，可能漏掉一次通知；没有保证“恰好显示一次”。提醒提交异常时也保留记录，重试不会再次播放。姓名结果应始终保留在桌面软件中，“抽取失败”和“发送失败”必须分别处理。
 
 插件不改动请求级的音效、语音或特效设置，不启动自己的音频引擎。ClassIsland 关闭提醒、主界面没有提醒消费者或提供方被禁用时，受理不等于显示。插件自身不记录学生文本，但 ClassIsland 自身的诊断日志可能记录提醒内容。
 

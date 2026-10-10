@@ -20,18 +20,28 @@ public partial class App : Application
     internal static bool IsMotionQa { get; private set; }
     internal static bool IsExpansionQa { get; private set; }
     internal static WidgetSettings Settings { get; private set; } = new();
+    internal static RollCallEngine RollCall { get; } = new();
+    internal static ClassIslandRollCallClient Notifications { get; private set; } = new();
+    internal static void UseIsolatedNotificationsForQa()
+    {
+        if (!IsSmoke) throw new InvalidOperationException("Requires isolated QA.");
+        Notifications.Dispose();
+        Notifications = new("SeatSheet.Qa.Missing." + Guid.NewGuid().ToString("N"));
+    }
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
         var appearanceQa = e.Args.Contains("--appearance-qa");
+        var rollCallQa = e.Args.Contains("--rollcall-qa");
         IsExpansionQa = e.Args.Contains("--expand-qa");
         IsMotionQa = e.Args.Contains("--motion-qa") || IsExpansionQa;
-        IsSmoke = e.Args.Contains("--smoke") || IsMotionQa || appearanceQa;
+        IsSmoke = e.Args.Contains("--smoke") || IsMotionQa || appearanceQa || rollCallQa;
         CompactSmoke = e.Args.Contains("--compact");
         if (IsSmoke) SmokeFolder = Path.Combine(AppContext.BaseDirectory, "qa");
         mutex = new Mutex(true, IsSmoke ? "SeatSheet.Widget.Smoke" : "SeatSheet.Widget.Desktop", out var first);
         if (!first) { Shutdown(); return; }
         Settings = IsSmoke ? new WidgetSettings() : LocalStore.LoadSettings();
+        if (!IsSmoke) Notifications.Start(() => Settings.RollCall.Output != "widget");
         panel = new PanelWindow();
         launcher = new LauncherWindow(panel);
         MainWindow = launcher;
@@ -50,7 +60,8 @@ public partial class App : Application
             tray.DoubleClick += (_, _) => Dispatcher.Invoke(() => panel.Open());
         }
         launcher.Show();
-        if (appearanceQa) _ = CheckAppearance();
+        if (rollCallQa) _ = panel.CheckRollCallUiAsync();
+        else if (appearanceQa) _ = CheckAppearance();
         else if (IsExpansionQa) _ = panel.CheckExpansion();
         else if (IsMotionQa) _ = panel.CheckMotion();
         else if (e.Args.Contains("--settings")) panel.ShowSettings();
@@ -59,6 +70,7 @@ public partial class App : Application
     protected override void OnExit(ExitEventArgs e)
     {
         tray?.Dispose();
+        Notifications.Dispose();
         trayIcon?.Dispose();
         mutex?.Dispose();
         base.OnExit(e);

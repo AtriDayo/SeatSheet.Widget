@@ -196,6 +196,26 @@ Check(invalidAck is { Status: "unsupportedVersion" }, "Protocol mismatch returns
 Check(!connection.Connected, "Rejected messages do not renew client activity");
 Console.WriteLine($"{checks} plugin checks passed.");
 
+using var desktopClient = new SeatSheet.Widget.ClassIslandRollCallClient(serverName);
+Check((await desktopClient.ProbeAsync()).Success, "Desktop client uses the official handshake route");
+var desktopMessage = Message(DateTimeOffset.UtcNow);
+var desktopBefore = ipcSink.Calls;
+Check((await desktopClient.SendAsync(desktopMessage)).Success && ipcSink.Calls == desktopBefore + 1,
+    "Desktop client sends a fixed result to the actual receiver");
+Check((await desktopClient.SendAsync(desktopMessage)).Success && ipcSink.Calls == desktopBefore + 1,
+    "Desktop resend retains the same ID and does not replay the notification");
+Check(!(await desktopClient.SendAsync(desktopMessage with { Student = new() { Name = new string('示',65) } })).Success && ipcSink.Calls == desktopBefore + 1,
+    "Notification format rejection cannot change or submit the original draw");
+var expiredDesktopMessage = desktopMessage with { ExpiresAtUtc = DateTimeOffset.UtcNow.AddSeconds(-1) };
+Check(!(await desktopClient.SendAsync(expiredDesktopMessage)).Success && ipcSink.Calls == desktopBefore + 1,
+    "Expired desktop retry preserves the result and does not send a fresh draw");
+using var unavailableClient = new SeatSheet.Widget.ClassIslandRollCallClient("SeatSheet.Missing." + Guid.NewGuid().ToString("N"));
+var originalDesktopId = desktopMessage.MessageId;
+var offlineDelivery = await unavailableClient.SendAsync(desktopMessage).WaitAsync(TimeSpan.FromSeconds(8));
+Check(!offlineDelivery.Success && desktopMessage.MessageId == originalDesktopId,
+    "Unavailable host returns a bounded notification failure");
+Console.WriteLine($"{checks} total plugin/client checks passed.");
+
 sealed class TestClock(DateTimeOffset now) : TimeProvider
 {
     public DateTimeOffset Now { get; set; } = now;

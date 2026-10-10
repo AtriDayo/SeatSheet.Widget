@@ -1,4 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><Nullable>enable</Nullable></PropertyGroup>
   <ItemGroup><Compile Include="../../src/SeatSheet.Widget/Models.cs" Link="Models.cs" /></ItemGroup>
+  <ItemGroup>
+    <Compile Include="../../src/SeatSheet.Widget/RollCall.cs" Link="RollCall.cs" />
+    <ProjectReference Include="../../src/SeatSheet.RollCall.Protocol/SeatSheet.RollCall.Protocol.csproj" />
+  </ItemGroup>
 </Project>

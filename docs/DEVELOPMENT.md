@@ -54,4 +54,6 @@ dotnet build src/SeatSheet.ClassIslandPlugin -c Release -p:PackagePlugin=true
 
 ## 开发辅助脚本
 
+桌面随机点名的设置、通信与验证见 [点名说明](ROLLCALL.md)。设置窗口的“随机点名”标签页集中管理名单、权重、缺席状态和显示目标。
+
 `dev/start-backend.ps1` 和 `dev/start-frontend.mjs` 是依赖相邻 SeatSheet 网站项目的本地联调工具，并非运行桌面软件的必要条件。图标资源位于 `src/SeatSheet.Widget/Assets`，`dev/convert-icon.py` 用 Pillow 转换应用图标尺寸。

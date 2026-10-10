@@ -6,6 +6,8 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="../../src/SeatSheet.Widget/ClassIslandRollCallClient.cs" Link="Client/ClassIslandRollCallClient.cs" />
+    <PackageReference Include="ClassIsland.Shared.IPC" Version="2.1.0.1" />
     <ProjectReference Include="../../src/SeatSheet.RollCall.Protocol/SeatSheet.RollCall.Protocol.csproj" />
     <PackageReference Include="dotnetCampus.Ipc" Version="2.0.0-alpha410" />
     <Compile Include="../../src/SeatSheet.ClassIslandPlugin/Reception/*.cs" Link="Reception/%(Filename)%(Extension)" />

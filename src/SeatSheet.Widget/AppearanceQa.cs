@@ -17,7 +17,7 @@ public partial class App
         {
             // A closed local port proves saving appearance does not depend on the API.
             Settings.ServerUrl = "http://localhost:18764";
-            var screenshot = new SettingsWindow(); screenshot.Show(); screenshot.UpdateLayout();
+            var screenshot = new SettingsWindow(); screenshot.Show(); await Task.Delay(250); screenshot.UpdateLayout();
             SaveAppearanceImage(screenshot, "settings-appearance"); screenshot.VerifyCancelForSmoke();
             foreach (var kind in new[] { LauncherStyles.Label, LauncherStyles.Slim, LauncherStyles.Arrow })
             {

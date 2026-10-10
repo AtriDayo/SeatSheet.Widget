@@ -253,7 +253,7 @@ public partial class PanelWindow : Window
     public void ShowSettings()
     {
         if (settingsWindow != null) { settingsWindow.Activate(); return; }
-        settingsWindow = new SettingsWindow();
+        settingsWindow = new SettingsWindow(cached);
         settingsWindow.Saved += async (_, _) =>
         {
             SettingsSaved?.Invoke(this, EventArgs.Empty);

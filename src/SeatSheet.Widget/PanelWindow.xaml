@@ -8,15 +8,18 @@
  <Grid x:Name="PanelContent" Margin="28,24,28,20">
   <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
   <Grid>
-   <StackPanel><TextBlock Text="SEATSHEET" Foreground="#245AE3" FontWeight="Bold" FontSize="12"/><TextBlock x:Name="PlanTitle" Text="座位表" FontSize="27" FontWeight="SemiBold" Margin="0,8,0,0"/></StackPanel>
-   <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+   <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+   <StackPanel Margin="0,0,16,0"><TextBlock Text="SEATSHEET" Foreground="#245AE3" FontWeight="Bold" FontSize="12"/><TextBlock x:Name="PlanTitle" Text="座位表" FontSize="27" FontWeight="SemiBold" Margin="0,8,0,0" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/></StackPanel>
+   <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+    <ui:IconButton x:Name="RollCallButton" Icon="seats" Label="点名" Click="RollCallClick" Margin="0,0,8,0" ToolTip="名单与权重在设置中调整"/>
     <ui:IconButton x:Name="RefreshButton" Icon="refresh" Label="刷新" Click="RefreshClick" ToolTip="获取最新座位表"/>
     <ui:IconButton Icon="right" Label="收起" Margin="8,0,0,0" Click="CollapseClick"/>
    </StackPanel>
   </Grid>
   <Grid Grid.Row="1" Margin="0,18,0,18">
-   <TextBlock x:Name="PlanStats" Text="连接你的班级，随时查看座位" Foreground="{StaticResource Muted}" VerticalAlignment="Center"/>
-   <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+   <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+   <TextBlock x:Name="PlanStats" Text="连接你的班级，随时查看座位" Foreground="{StaticResource Muted}" VerticalAlignment="Center" Margin="0,0,12,0" TextWrapping="Wrap"/>
+   <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
     <ui:IconButton Icon="fit" Label="适应" Click="FitClick" Padding="10,5"/><ui:IconButton Icon="minus" Click="ZoomOutClick" Margin="6,0,0,0" Padding="10,5" ToolTip="缩小座位表"/>
     <ui:IconButton Icon="plus" Click="ZoomInClick" Margin="6,0,0,0" Padding="10,5" ToolTip="放大座位表"/>
     <ui:IconButton x:Name="ExpandButton" Icon="expand" Label="展开" Click="ExpandClick" Margin="6,0,0,0" Padding="10,5"/>
@@ -36,7 +39,7 @@
   </Grid>
   <Grid Grid.Row="4" Margin="0,20,0,0">
    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-   <StackPanel VerticalAlignment="Center" Margin="0,0,12,0"><TextBlock x:Name="ConnectionStatus" Text="正在连接" FontSize="12" TextWrapping="Wrap"/><TextBlock x:Name="UpdatedLabel" Foreground="{StaticResource Muted}" FontSize="11" Margin="0,4,0,0"/></StackPanel>
+   <StackPanel VerticalAlignment="Center" Margin="0,0,12,0"><TextBlock x:Name="ConnectionStatus" Text="正在连接" FontSize="12" TextWrapping="Wrap"/><TextBlock x:Name="UpdatedLabel" Foreground="{StaticResource Muted}" FontSize="11" Margin="0,4,0,0"/><TextBlock x:Name="RollCallStatus" FontSize="11" Foreground="{StaticResource Muted}" TextWrapping="Wrap" Visibility="Collapsed" Margin="0,4,0,0"/></StackPanel>
    <StackPanel Grid.Column="1" Orientation="Horizontal"><ui:IconButton Icon="external" Label="管理座位" Click="ManageClick"/><ui:IconButton Icon="settings" Label="设置" Click="SettingsClick" Margin="8,0,0,0"/></StackPanel>
   </Grid>
  </Grid>

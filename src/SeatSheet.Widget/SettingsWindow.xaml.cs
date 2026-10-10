@@ -8,12 +8,15 @@ public partial class SettingsWindow : Window
 {
     private bool closed;
     public event EventHandler? Saved;
-    public SettingsWindow()
+    public SettingsWindow(CachedPlan? plan = null)
     {
         InitializeComponent();
+        InitializeWindowMotion();
+        InitializeRollCall(plan ?? (App.IsSmoke ? null : LocalStore.ReadCache(App.Settings.ServerUrl)));
         Address.Text = App.Settings.ServerUrl;
         PanelWidth.Value = App.Settings.PanelWidth;
         Height = Math.Min(850, Math.Max(360, SystemParameters.WorkArea.Height - 48));
+        Width = Math.Min(860, Math.Max(480, SystemParameters.WorkArea.Width - 48));
         var kind = LauncherStyles.Normalize(App.Settings.LauncherStyle);
         LabelOption.IsChecked = kind == LauncherStyles.Label;
         SlimOption.IsChecked = kind == LauncherStyles.Slim;
@@ -24,6 +27,12 @@ public partial class SettingsWindow : Window
     private async void TestClick(object sender, RoutedEventArgs e) => await CheckConnection(false);
     private async Task CheckConnection(bool save)
     {
+        if (save)
+        {
+            try { ApplyRosterDraft(); }
+            catch (Exception ex) { RollCallSettingsMessage.Text = ex.Message; SettingsTabs.SelectedIndex = 1; return; }
+        }
+        SettingsTabs.IsEnabled = false;
         SaveButton.IsEnabled = TestButton.IsEnabled = Address.IsEnabled = PanelWidth.IsEnabled = CancelButton.IsEnabled = false;
         HandleOptions.IsEnabled = false;
         ConnectionProgress.Visibility = Visibility.Visible;
@@ -47,11 +56,14 @@ public partial class SettingsWindow : Window
             var oldSource = App.Settings.ServerUrl;
             var oldWidth = App.Settings.PanelWidth;
             var oldStyle = App.Settings.LauncherStyle;
+            var oldRollCall = App.Settings.RollCall;
             App.Settings.ServerUrl = source;
             App.Settings.PanelWidth = PanelWidth.Value;
             App.Settings.LauncherStyle = SlimOption.IsChecked == true ? LauncherStyles.Slim : ArrowOption.IsChecked == true ? LauncherStyles.Arrow : LauncherStyles.Label;
+            App.Settings.RollCall = rollCallDraft.Clone();
             try { LocalStore.SaveSettings(); }
-            catch { App.Settings.ServerUrl = oldSource; App.Settings.PanelWidth = oldWidth; App.Settings.LauncherStyle = oldStyle; throw; }
+            catch { App.Settings.ServerUrl = oldSource; App.Settings.PanelWidth = oldWidth; App.Settings.LauncherStyle = oldStyle; App.Settings.RollCall = oldRollCall; throw; }
+            if (resetRound) App.RollCall.ResetRound();
             if (result != null) try { LocalStore.SaveCache(result); } catch { /* The live connection remains usable. */ }
             Saved?.Invoke(this, EventArgs.Empty);
             Close();
@@ -70,6 +82,7 @@ public partial class SettingsWindow : Window
         }
         finally
         {
+            SettingsTabs.IsEnabled = true;
             SaveButton.IsEnabled = TestButton.IsEnabled = Address.IsEnabled = PanelWidth.IsEnabled = CancelButton.IsEnabled = true;
             HandleOptions.IsEnabled = true;
             ConnectionProgress.Visibility = Visibility.Collapsed;

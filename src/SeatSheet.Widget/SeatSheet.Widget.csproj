@@ -11,4 +11,8 @@
   </PropertyGroup>
   <ItemGroup><Resource Include="Assets/app-icon.png"/><Resource Include="Assets/app.ico"/></ItemGroup>
   <ItemGroup><Resource Include="Assets/Icons/ui.svg"/></ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../SeatSheet.RollCall.Protocol/SeatSheet.RollCall.Protocol.csproj" />
+    <PackageReference Include="ClassIsland.Shared.IPC" Version="2.1.0.1" />
+  </ItemGroup>
 </Project>
