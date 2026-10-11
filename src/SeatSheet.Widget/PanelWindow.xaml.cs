@@ -24,6 +24,8 @@ public partial class PanelWindow : Window
     private bool loading, expanded, fit = true, closing;
     private SettingsWindow? settingsWindow;
     private double boardWidth, boardHeight;
+    private string connectionSummary = "正在连接";
+    private bool connectionOnline;
     private bool motionActive;
     private int motionVersion;
     private readonly DispatcherTimer geometryTimer = new() { Interval = TimeSpan.FromSeconds(2) };
@@ -150,6 +152,7 @@ public partial class PanelWindow : Window
         loading = true;
         RefreshButton.IsEnabled = false;
         ConnectionStatus.Text = "正在获取最新座位表…";
+        ConnectionDetails.Text = "正在获取最新座位表…";
         try
         {
             var result = await SeatApi.Fetch(source);
@@ -161,7 +164,7 @@ public partial class PanelWindow : Window
             if (changed) Render(result.Plan);
             Status("已连接 · 打开面板时自动刷新", true);
             try { LocalStore.SaveCache(result); }
-            catch { ConnectionStatus.Text += " · 本次缓存未能保存"; }
+            catch { ConnectionDetails.Text += " · 本次缓存未能保存"; }
         }
         catch (Exception ex)
         {
@@ -186,9 +189,24 @@ public partial class PanelWindow : Window
     }
     private void Status(string message, bool online)
     {
-        ConnectionStatus.Text = message;
-        ConnectionStatus.Foreground = Brush(online ? "#246849" : "#98621E");
-        UpdatedLabel.Text = cached == null ? "" : $"座位更新 {cached.Plan.UpdatedAt.ToLocalTime():MM-dd HH:mm}  ·  获取于 {cached.FetchedAt:MM-dd HH:mm}";
+        connectionOnline = online;
+        connectionSummary = online ? "已连接 · 打开面板时自动刷新" : cached != null ? "离线 · 使用最近的座位表" : "未连接 · 请检查设置";
+        ConnectionDetails.Text = message;
+        RestoreConnectionSummary();
+        if (cached != null) UpdatePlanMetadata(cached.Plan);
+    }
+    private void RestoreConnectionSummary()
+    {
+        ConnectionStatus.Text = connectionSummary;
+        ConnectionStatus.Foreground = Brush(connectionOnline ? "#246849" : "#98621E");
+    }
+    private void UpdatePlanMetadata(SeatPlan plan)
+    {
+        PlanStats.Text = $"{plan.Rows} 排 × {plan.Columns} 列   ·   {plan.Seats.Count(s => !string.IsNullOrWhiteSpace(s.Name) || !string.IsNullOrWhiteSpace(s.StudentNo))} 人已安排";
+        var updated = plan.UpdatedAt == default ? "" : $"座位更新 {plan.UpdatedAt.ToLocalTime():MM-dd HH:mm}";
+        var fetched = cached?.FetchedAt is { } time && time != default ? $"获取于 {time.ToLocalTime():MM-dd HH:mm}" : "";
+        UpdatedLabel.Text = string.Join(" · ", new[] {updated, fetched}.Where(s => s.Length > 0));
+        UpdatedLabel.Visibility = UpdatedLabel.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
     }
     private static SolidColorBrush Brush(string color) => new((Color)ColorConverter.ConvertFromString(color));
     private static TextBlock Label(string text, double size, string color = "#18243B") => new()
@@ -199,7 +217,7 @@ public partial class PanelWindow : Window
     {
         EmptyState.Visibility = Visibility.Collapsed;
         PlanTitle.Text = plan.Name;
-        PlanStats.Text = $"{plan.Rows} 排 × {plan.Columns} 列   ·   {plan.Seats.Count(s => !string.IsNullOrWhiteSpace(s.Name) || !string.IsNullOrWhiteSpace(s.StudentNo))} 人已安排";
+        UpdatePlanMetadata(plan);
         Board.Children.Clear(); Board.RowDefinitions.Clear(); Board.ColumnDefinitions.Clear();
         var aisles = plan.AisleAfterColumns.Where(c => c >= 0 && c < plan.Columns - 1).Distinct().OrderBy(c => c).ToArray();
         Board.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(58) });
@@ -246,7 +264,7 @@ public partial class PanelWindow : Window
     }
     private void ApplyFit()
     {
-        if ((resizeActive && !handoffActive) || !fit || boardWidth <= 0 || BoardScroll.ActualWidth <= 0) return;
+        if (!fit || boardWidth <= 0 || BoardScroll.ActualWidth <= 0) return;
         var scale = Math.Clamp(Math.Min((BoardScroll.ActualWidth - 20) / boardWidth, (BoardScroll.ActualHeight - 20) / boardHeight), 0.25, 1.3);
         BoardScale.ScaleX = BoardScale.ScaleY = scale;
     }
@@ -260,7 +278,7 @@ public partial class PanelWindow : Window
             cached = LocalStore.ReadCache(App.Settings.ServerUrl);
             if (cached != null) Render(cached.Plan);
             else { Board.Children.Clear(); PlanTitle.Text = "座位表"; PlanStats.Text = "连接你的班级，随时查看座位"; EmptyState.Visibility = Visibility.Visible; EmptyTitle.Text = "正在获取座位表…"; UpdatedLabel.Text = ""; }
-            if (resizeActive) FinishExpansion(immediate: true);
+            if (resizeActive) FinishExpansion();
             Position();
             await Refresh();
         };
@@ -285,7 +303,7 @@ public partial class PanelWindow : Window
     private void ManageClick(object sender, RoutedEventArgs e)
     {
         try { Process.Start(new ProcessStartInfo(App.Settings.ServerUrl + "/config") { UseShellExecute = true }); }
-        catch { ConnectionStatus.Text = "无法打开浏览器，请手动访问网站的 /config 页面。"; }
+        catch { ConnectionStatus.Text = "无法打开管理页面 · 查看详情"; ConnectionDetails.Text = "无法打开浏览器，请手动访问网站的 /config 页面。"; }
     }
     internal async Task CheckMotion()
     {

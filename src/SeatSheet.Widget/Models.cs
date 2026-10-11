@@ -40,6 +40,7 @@ public sealed class WidgetSettings
     public double ButtonTopRatio { get; set; } = 0.42;
     public double PanelWidth { get; set; } = 920;
     public string LauncherStyle { get; set; } = LauncherStyles.Label;
+    public bool DynamicResizeAnimation { get; set; } = false;
     public RollCallOptions RollCall { get; set; } = new();
 }
 public static class LauncherStyles

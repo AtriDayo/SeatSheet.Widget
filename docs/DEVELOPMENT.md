@@ -25,6 +25,8 @@ dotnet run --project tests/SeatSheet.Widget.Checks -c Release
 
 常规编译文件位于各项目自己的 `bin/` 和 `obj/` 中。Release 编译输出为 `src/SeatSheet.Widget/bin/Release/net8.0-windows/`，它与可分发的单 EXE 发布目录不同。
 
+展开与还原使用实时布局，文字与按钮保持尺寸，座位表保持等比缩放。过渡只调整固定宿主内的面板位置、大小和圆角，不使用拉伸截图；布局动画更新频率上限为 30 帧。“展开和还原动画”默认关闭，旧配置缺少该选项时也保持关闭，直接切换大小。可在“常规 → 面板显示”手动开启，并遵循 Windows 界面动画开关。实际流畅度应在目标旧电脑上试用确认。
+
 实际 WPF 界面检查会自动退出，不写用户配置；图像和结果放在编译输出目录的 `qa/` 中。
 
 ```powershell

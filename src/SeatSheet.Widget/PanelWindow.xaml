@@ -11,14 +11,13 @@
    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
    <StackPanel Margin="0,0,16,0"><TextBlock Text="SEATSHEET" Foreground="#245AE3" FontWeight="Bold" FontSize="12"/><TextBlock x:Name="PlanTitle" Text="座位表" FontSize="27" FontWeight="SemiBold" Margin="0,8,0,0" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/></StackPanel>
    <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-    <ui:IconButton x:Name="RollCallButton" Icon="seats" Label="点名" Click="RollCallClick" Margin="0,0,8,0" ToolTip="名单与权重在设置中调整"/>
     <ui:IconButton x:Name="RefreshButton" Icon="refresh" Label="刷新" Click="RefreshClick" ToolTip="获取最新座位表"/>
     <ui:IconButton Icon="right" Label="收起" Margin="8,0,0,0" Click="CollapseClick"/>
    </StackPanel>
   </Grid>
   <Grid Grid.Row="1" Margin="0,18,0,18">
    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-   <TextBlock x:Name="PlanStats" Text="连接你的班级，随时查看座位" Foreground="{StaticResource Muted}" VerticalAlignment="Center" Margin="0,0,12,0" TextWrapping="Wrap"/>
+   <StackPanel x:Name="PlanMetadata" VerticalAlignment="Center" Margin="0,0,12,0"><TextBlock x:Name="PlanStats" Text="连接你的班级，随时查看座位" Foreground="{StaticResource Muted}" TextWrapping="Wrap"/><TextBlock x:Name="UpdatedLabel" Foreground="{StaticResource Muted}" FontSize="11" Margin="0,4,0,0" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/></StackPanel>
    <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
     <ui:IconButton Icon="fit" Label="适应" Click="FitClick" Padding="10,5"/><ui:IconButton Icon="minus" Click="ZoomOutClick" Margin="6,0,0,0" Padding="10,5" ToolTip="缩小座位表"/>
     <ui:IconButton Icon="plus" Click="ZoomInClick" Margin="6,0,0,0" Padding="10,5" ToolTip="放大座位表"/>
@@ -39,15 +38,13 @@
   </Grid>
   <Grid Grid.Row="4" Margin="0,20,0,0">
    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-   <StackPanel VerticalAlignment="Center" Margin="0,0,12,0"><TextBlock x:Name="ConnectionStatus" Text="正在连接" FontSize="12" TextWrapping="Wrap"/><TextBlock x:Name="UpdatedLabel" Foreground="{StaticResource Muted}" FontSize="11" Margin="0,4,0,0"/><TextBlock x:Name="RollCallStatus" FontSize="11" Foreground="{StaticResource Muted}" TextWrapping="Wrap" Visibility="Collapsed" Margin="0,4,0,0"/></StackPanel>
-   <StackPanel Grid.Column="1" Orientation="Horizontal"><ui:IconButton Icon="external" Label="管理座位" Click="ManageClick"/><ui:IconButton Icon="settings" Label="设置" Click="SettingsClick" Margin="8,0,0,0"/></StackPanel>
+   <TextBlock x:Name="ConnectionStatus" Text="正在连接" FontSize="12" VerticalAlignment="Center" Margin="0,0,12,0" TextTrimming="CharacterEllipsis" ToolTipService.ShowDuration="60000">
+    <TextBlock.ToolTip><ToolTip MaxWidth="360"><StackPanel><TextBlock x:Name="ConnectionDetails" Text="正在连接" FontSize="12" TextWrapping="Wrap"/><TextBlock x:Name="RollCallStatus" FontSize="12" TextWrapping="Wrap" Visibility="Collapsed" Margin="0,6,0,0"/></StackPanel></ToolTip></TextBlock.ToolTip>
+   </TextBlock>
+   <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Bottom"><ui:IconButton x:Name="RollCallButton" Icon="seats" Label="点名" Click="RollCallClick" Margin="0,0,8,0" MinHeight="40" Background="#245AE3" Foreground="White" BorderBrush="#245AE3" ToolTip="名单与权重在设置中调整"/><ui:IconButton Icon="external" Label="管理座位" Click="ManageClick" MinHeight="40"/><ui:IconButton Icon="settings" Label="设置" Click="SettingsClick" Margin="8,0,0,0" MinHeight="40"/></StackPanel>
   </Grid>
  </Grid>
  </Border>
  </Grid>
- <Canvas x:Name="ExpansionLayer" Visibility="Collapsed">
-   <Border x:Name="ExpansionCard"><Image x:Name="ExpansionImage" Stretch="Fill"/></Border>
-   <ui:IconButton x:Name="ExpansionToggle" Icon="restore" Label="还原" Click="ExpandClick" Padding="10,5"/>
- </Canvas>
  </Grid>
 </Window>

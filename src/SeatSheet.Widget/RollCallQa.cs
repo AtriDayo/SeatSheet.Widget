@@ -16,7 +16,7 @@ public partial class PanelWindow
         Directory.CreateDirectory(App.SmokeFolder!);
         try
         {
-            cached = new CachedPlan { Source = App.Settings.ServerUrl, Plan = new SeatPlan { Name = "示例班级", Rows = 2, Columns = 3,
+            cached = new CachedPlan { Source = App.Settings.ServerUrl, FetchedAt=DateTimeOffset.Now, Plan = new SeatPlan { Name = "示例班级", Rows = 2, Columns = 3, UpdatedAt=DateTimeOffset.UtcNow,
                 Seats = new() { new() { Name="示例甲",StudentNo="01" },new() { Name="示例乙",StudentNo="02",Column=1 },
                     new() {Name="示例丙",StudentNo="03",Row=1},new() {Row=1,Column=1,Name=" "} } } };
             // Use a full classroom, not three rows, to expose scrollbar and alignment problems.
@@ -48,6 +48,9 @@ public partial class PanelWindow
             await settings.VerifyRollCallDraftForSmoke(true);
             Render(cached.Plan);
             Position(); MotionRoot.Opacity=1; Show(); await Task.Delay(80); UpdateLayout(); ApplyFit();
+            Status("已连接 · 打开面板时自动刷新",true);
+            if (UpdatedLabel.Parent != PlanMetadata || !ConnectionStatus.Text.StartsWith("已连接"))
+                throw new InvalidOperationException("Panel metadata or compact connection summary is misplaced.");
             CaptureRollCallView(PanelSurface,"classroom-panel");
             var previousWidth=App.Settings.PanelWidth;
             App.Settings.PanelWidth=480; Position(); await Task.Delay(80); UpdateLayout(); ApplyFit();
@@ -66,13 +69,17 @@ public partial class PanelWindow
             var originalId = lastRollCall!.MessageId;
             await RetryRollCallAsync();
             if (lastRollCall.MessageId != originalId) throw new InvalidOperationException("Retry redrew the student.");
+            if (!ConnectionStatus.Text.StartsWith("已连接") || RollCallStatus.Text.Length==0)
+                throw new InvalidOperationException("Delivery warning replaced the connection summary or lost its detail.");
+            if (resultWindow.ResultSurface.CornerRadius.TopLeft!=18 || !resultWindow.AllowsTransparency || System.Windows.Shell.WindowChrome.GetWindowChrome(resultWindow)!=null)
+                throw new InvalidOperationException("Result window did not use transparent rounded corners.");
             CaptureRollCallView(resultWindow,"rollcall-fallback");
             resultWindow.SetResult(new RollCallMessage { Student=new RollCallStudent {Name="示例同学长姓名布局检查", ClassName="示例班级：用于检查较长班级名称的显示",Seat=new RollCallSeat {Row=8,Column=6}}},true);
             resultWindow.SetStatus("通知发送失败：ClassIsland 暂不可用。已在本软件显示；重发此结果不会重新抽人。");
             CaptureRollCallView(resultWindow,"rollcall-long-text");
             resultWindow.Close();
             File.WriteAllText(Path.Combine(App.SmokeFolder!,"rollcall-result.json"),JsonSerializer.Serialize(new {passed=true,
-                checks=new[] {"settings opening and closing settle","full classroom at three render scales","wide and narrow layout snapshots","long result text snapshot","draft output updates connection controls","settings cancel preserves draft","offline settings save","empty seat filtering","absent student exclusion","local result window","external failure falls back to local","retry preserves result ID"}}));
+                checks=new[] {"settings opening and closing settle","full classroom at three render scales","wide and narrow layout snapshots","long result text snapshot","draft output updates connection controls","settings cancel preserves draft","offline settings save","empty seat filtering","absent student exclusion","transparent rounded local result window","compact connection summary","metadata beside row and column counts","external failure falls back to local","retry preserves result ID"}}));
             Application.Current.Shutdown();
         }
         catch(Exception ex)

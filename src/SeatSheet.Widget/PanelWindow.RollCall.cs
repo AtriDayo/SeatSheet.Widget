@@ -63,6 +63,8 @@ public partial class PanelWindow
     private void SetRollCallStatus(string text, bool error)
     {
         RollCallStatus.Text = text; RollCallStatus.Visibility = Visibility.Visible;
+        if (error) { ConnectionStatus.Text = "点名失败 · 查看详情"; ConnectionStatus.Foreground = Brush("#A6412F"); }
+        else RestoreConnectionSummary();
         resultWindow?.SetStatus(text);
         if (error) resultWindow?.Activate();
     }

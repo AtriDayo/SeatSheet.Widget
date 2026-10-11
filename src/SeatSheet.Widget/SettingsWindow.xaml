@@ -77,7 +77,7 @@
     <Style TargetType="TabControl"><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="TabControl"><Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions><StackPanel Orientation="Horizontal" IsItemsHost="True" Margin="0,0,0,16"/><ContentPresenter Grid.Row="1" ContentSource="SelectedContent"/></Grid></ControlTemplate></Setter.Value></Setter></Style>
    </TabControl.Resources>
    <TabItem Header="常规">
-  <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+  <ScrollViewer x:Name="GeneralSettingsScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
    <StackPanel>
     <Border Background="White" BorderBrush="#E1E7F0" BorderThickness="1" CornerRadius="12" Padding="18" Margin="0,0,0,14">
      <StackPanel>
@@ -131,6 +131,8 @@
       </Slider>
       <Grid Margin="0,5,0,0"><TextBlock Text="较窄" FontSize="11" Foreground="{StaticResource Muted}"/><TextBlock Text="较宽" HorizontalAlignment="Right" FontSize="11" Foreground="{StaticResource Muted}"/></Grid>
       <TextBlock x:Name="WidthHint" TextWrapping="Wrap" FontSize="11" Foreground="{StaticResource Muted}" Margin="0,12,0,0"/>
+      <CheckBox x:Name="ResizeAnimationOption" Margin="0,18,0,0"><TextBlock Text="展开和还原动画" FontSize="12"/></CheckBox>
+      <TextBlock Text="内容随尺寸重新布局。若电脑运行不流畅，可关闭以直接切换。" TextWrapping="Wrap" FontSize="11" Foreground="{StaticResource Muted}" Margin="0,6,0,0"/>
      </StackPanel>
     </Border>
    </StackPanel>

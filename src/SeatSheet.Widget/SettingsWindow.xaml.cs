@@ -15,6 +15,7 @@ public partial class SettingsWindow : Window
         InitializeRollCall(plan ?? (App.IsSmoke ? null : LocalStore.ReadCache(App.Settings.ServerUrl)));
         Address.Text = App.Settings.ServerUrl;
         PanelWidth.Value = App.Settings.PanelWidth;
+        ResizeAnimationOption.IsChecked = App.Settings.DynamicResizeAnimation;
         Height = Math.Min(850, Math.Max(360, SystemParameters.WorkArea.Height - 48));
         Width = Math.Min(860, Math.Max(480, SystemParameters.WorkArea.Width - 48));
         var kind = LauncherStyles.Normalize(App.Settings.LauncherStyle);
@@ -57,12 +58,14 @@ public partial class SettingsWindow : Window
             var oldWidth = App.Settings.PanelWidth;
             var oldStyle = App.Settings.LauncherStyle;
             var oldRollCall = App.Settings.RollCall;
+            var oldResizeAnimation = App.Settings.DynamicResizeAnimation;
             App.Settings.ServerUrl = source;
             App.Settings.PanelWidth = PanelWidth.Value;
             App.Settings.LauncherStyle = SlimOption.IsChecked == true ? LauncherStyles.Slim : ArrowOption.IsChecked == true ? LauncherStyles.Arrow : LauncherStyles.Label;
             App.Settings.RollCall = rollCallDraft.Clone();
+            App.Settings.DynamicResizeAnimation = ResizeAnimationOption.IsChecked == true;
             try { LocalStore.SaveSettings(); }
-            catch { App.Settings.ServerUrl = oldSource; App.Settings.PanelWidth = oldWidth; App.Settings.LauncherStyle = oldStyle; App.Settings.RollCall = oldRollCall; throw; }
+            catch { App.Settings.ServerUrl = oldSource; App.Settings.PanelWidth = oldWidth; App.Settings.LauncherStyle = oldStyle; App.Settings.RollCall = oldRollCall; App.Settings.DynamicResizeAnimation = oldResizeAnimation; throw; }
             if (resetRound) App.RollCall.ResetRound();
             if (result != null) try { LocalStore.SaveCache(result); } catch { /* The live connection remains usable. */ }
             Saved?.Invoke(this, EventArgs.Empty);
@@ -104,10 +107,12 @@ public partial class SettingsWindow : Window
     {
         var kind = App.Settings.LauncherStyle;
         var width = App.Settings.PanelWidth;
+        var animation = App.Settings.DynamicResizeAnimation;
         ArrowOption.IsChecked = true;
         PanelWidth.Value = width + 20;
+        ResizeAnimationOption.IsChecked = !animation;
         Close();
-        if (kind != App.Settings.LauncherStyle || width != App.Settings.PanelWidth)
+        if (kind != App.Settings.LauncherStyle || width != App.Settings.PanelWidth || animation != App.Settings.DynamicResizeAnimation)
             throw new InvalidOperationException("Cancel changed the active appearance settings.");
     }
     internal async Task VerifyAppearanceForSmoke(string kind)
@@ -116,10 +121,11 @@ public partial class SettingsWindow : Window
         LabelOption.IsChecked = kind == LauncherStyles.Label;
         SlimOption.IsChecked = kind == LauncherStyles.Slim;
         ArrowOption.IsChecked = kind == LauncherStyles.Arrow;
+        ResizeAnimationOption.IsChecked = kind != LauncherStyles.Slim;
         var saved = false;
         Saved += (_, _) => saved = true;
         await CheckConnection(true);
-        if (!saved || App.Settings.LauncherStyle != kind)
+        if (!saved || App.Settings.LauncherStyle != kind || App.Settings.DynamicResizeAnimation != (kind != LauncherStyles.Slim))
             throw new InvalidOperationException("Could not save the selected handle style while offline.");
     }
     internal async Task VerifyConnectionForSmoke()
