@@ -7,15 +7,26 @@ namespace SeatSheet.Widget;
 public partial class SettingsWindow : Window
 {
     private bool closed;
+    private readonly bool firstUse = string.IsNullOrWhiteSpace(App.Settings.ServerUrl);
     public event EventHandler? Saved;
     public SettingsWindow(CachedPlan? plan = null)
     {
         InitializeComponent();
         InitializeWindowMotion();
+        InitializeTabMotion();
         InitializeRollCall(plan ?? (App.IsSmoke ? null : LocalStore.ReadCache(App.Settings.ServerUrl)));
         Address.Text = App.Settings.ServerUrl;
+        AboutVersion.Text = "桌面版本 " + ProductInfo.Version;
+        if (firstUse)
+        {
+            ConnectionState.Text = "尚未配置网站";
+            Message.Text = "请填写自己的 SeatSheet 网站地址；也可以稍后配置。";
+            CancelButton.Content = "稍后配置";
+            Loaded += (_, _) => { ConnectionCard.BringIntoView(); Address.Focus(); };
+        }
         PanelWidth.Value = App.Settings.PanelWidth;
         ResizeAnimationOption.IsChecked = App.Settings.DynamicResizeAnimation;
+        TabAnimationOption.IsChecked = App.Settings.SettingsTabAnimation;
         Height = Math.Min(850, Math.Max(360, SystemParameters.WorkArea.Height - 48));
         Width = Math.Min(860, Math.Max(480, SystemParameters.WorkArea.Width - 48));
         var kind = LauncherStyles.Normalize(App.Settings.LauncherStyle);
@@ -42,7 +53,8 @@ public partial class SettingsWindow : Window
         Message.Text = "正在获取座位表，请稍候。";
         try
         {
-            var source = SeatApi.Normalize(Address.Text);
+            var source = save && string.IsNullOrWhiteSpace(Address.Text) && string.IsNullOrWhiteSpace(App.Settings.ServerUrl)
+                ? "" : SeatApi.Normalize(Address.Text);
             // Keep appearance changes available offline; a new endpoint must validate first.
             var result = !save || source != App.Settings.ServerUrl ? await SeatApi.Fetch(source) : null;
             if (closed) return;
@@ -59,13 +71,15 @@ public partial class SettingsWindow : Window
             var oldStyle = App.Settings.LauncherStyle;
             var oldRollCall = App.Settings.RollCall;
             var oldResizeAnimation = App.Settings.DynamicResizeAnimation;
+            var oldTabAnimation = App.Settings.SettingsTabAnimation;
             App.Settings.ServerUrl = source;
             App.Settings.PanelWidth = PanelWidth.Value;
             App.Settings.LauncherStyle = SlimOption.IsChecked == true ? LauncherStyles.Slim : ArrowOption.IsChecked == true ? LauncherStyles.Arrow : LauncherStyles.Label;
             App.Settings.RollCall = rollCallDraft.Clone();
             App.Settings.DynamicResizeAnimation = ResizeAnimationOption.IsChecked == true;
+            App.Settings.SettingsTabAnimation = TabAnimationOption.IsChecked == true;
             try { LocalStore.SaveSettings(); }
-            catch { App.Settings.ServerUrl = oldSource; App.Settings.PanelWidth = oldWidth; App.Settings.LauncherStyle = oldStyle; App.Settings.RollCall = oldRollCall; App.Settings.DynamicResizeAnimation = oldResizeAnimation; throw; }
+            catch { App.Settings.ServerUrl = oldSource; App.Settings.PanelWidth = oldWidth; App.Settings.LauncherStyle = oldStyle; App.Settings.RollCall = oldRollCall; App.Settings.DynamicResizeAnimation = oldResizeAnimation; App.Settings.SettingsTabAnimation = oldTabAnimation; throw; }
             if (resetRound) App.RollCall.ResetRound();
             if (result != null) try { LocalStore.SaveCache(result); } catch { /* The live connection remains usable. */ }
             Saved?.Invoke(this, EventArgs.Empty);
@@ -108,11 +122,13 @@ public partial class SettingsWindow : Window
         var kind = App.Settings.LauncherStyle;
         var width = App.Settings.PanelWidth;
         var animation = App.Settings.DynamicResizeAnimation;
+        var tabsAnimation = App.Settings.SettingsTabAnimation;
         ArrowOption.IsChecked = true;
         PanelWidth.Value = width + 20;
         ResizeAnimationOption.IsChecked = !animation;
+        TabAnimationOption.IsChecked = !tabsAnimation;
         Close();
-        if (kind != App.Settings.LauncherStyle || width != App.Settings.PanelWidth || animation != App.Settings.DynamicResizeAnimation)
+        if (kind != App.Settings.LauncherStyle || width != App.Settings.PanelWidth || animation != App.Settings.DynamicResizeAnimation || tabsAnimation != App.Settings.SettingsTabAnimation)
             throw new InvalidOperationException("Cancel changed the active appearance settings.");
     }
     internal async Task VerifyAppearanceForSmoke(string kind)
@@ -122,11 +138,40 @@ public partial class SettingsWindow : Window
         SlimOption.IsChecked = kind == LauncherStyles.Slim;
         ArrowOption.IsChecked = kind == LauncherStyles.Arrow;
         ResizeAnimationOption.IsChecked = kind != LauncherStyles.Slim;
+        TabAnimationOption.IsChecked = kind == LauncherStyles.Arrow;
         var saved = false;
         Saved += (_, _) => saved = true;
         await CheckConnection(true);
-        if (!saved || App.Settings.LauncherStyle != kind || App.Settings.DynamicResizeAnimation != (kind != LauncherStyles.Slim))
+        if (!saved || App.Settings.LauncherStyle != kind || App.Settings.DynamicResizeAnimation != (kind != LauncherStyles.Slim) || App.Settings.SettingsTabAnimation != (kind == LauncherStyles.Arrow))
             throw new InvalidOperationException("Could not save the selected handle style while offline.");
+    }
+    internal async Task VerifyUnconfiguredForSmoke()
+    {
+        if (!App.IsSmoke || App.Settings.ServerUrl != "") throw new InvalidOperationException("Requires unconfigured isolated QA.");
+        Address.Text = "http://127.0.0.1:1";
+        var saved = false;
+        Saved += (_, _) => saved = true;
+        await CheckConnection(true);
+        if (saved || App.Settings.ServerUrl != "" || ConnectionState.Text != "连接或保存失败")
+            throw new InvalidOperationException("Failed first connection modified the current settings.");
+        Address.Text = "";
+        PanelWidth.Value = 960;
+        await CheckConnection(true);
+        if (!saved || App.Settings.ServerUrl != "" || App.Settings.PanelWidth != 960)
+            throw new InvalidOperationException("Unconfigured appearance could not be saved without a network request.");
+    }
+    internal async Task VerifyFirstConnectionForSmoke(string source)
+    {
+        if (!App.IsSmoke || App.Settings.ServerUrl != "") throw new InvalidOperationException("Requires isolated first-use QA.");
+        Address.Text = source;
+        await CheckConnection(false);
+        if (App.Settings.ServerUrl != "" || ConnectionState.Text != "连接成功" || !Message.Text.Contains("示例班级"))
+            throw new InvalidOperationException("First-use probe saved prematurely or missed the class name.");
+        App.SaveAppearanceImage(this, "settings-first-connected");
+        var saved = false;
+        Saved += (_, _) => saved = true;
+        await CheckConnection(true);
+        if (!saved || App.Settings.ServerUrl != source) throw new InvalidOperationException("First-use save did not validate and activate the new source.");
     }
     internal async Task VerifyConnectionForSmoke()
     {

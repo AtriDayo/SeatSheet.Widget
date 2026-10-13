@@ -16,6 +16,8 @@ public sealed class RollCallOptions
 {
     public string Output { get; set; } = "widget";
     public bool NoRepeat { get; set; }
+    public bool FloatingWindow { get; set; }
+    public bool DisableDuringBreak { get; set; }
     public Dictionary<string, Dictionary<string, ParticipantRule>> Classes { get; set; } = new();
     public RollCallOptions Clone() => JsonSerializer.Deserialize<RollCallOptions>(JsonSerializer.Serialize(this))!;
     public void Validate()

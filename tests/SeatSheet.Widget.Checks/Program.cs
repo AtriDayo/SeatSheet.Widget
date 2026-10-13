@@ -20,8 +20,17 @@ internal static class Program
     }
     public static async Task Main()
     {
+        Check(System.Text.Json.JsonSerializer.Deserialize<WidgetSettings>("{}")!.ServerUrl == "", "First use never preconfigures a development server");
+        var quickSettings = System.Text.Json.JsonSerializer.Deserialize<WidgetSettings>(System.Text.Json.JsonSerializer.Serialize(new WidgetSettings {
+            RollCall = new RollCallOptions { FloatingWindow = true, DisableDuringBreak = true }, RollCallLeftRatio = .4, RollCallTopRatio = .6 }))!;
+        Check(quickSettings.RollCall.FloatingWindow && quickSettings.RollCall.DisableDuringBreak && quickSettings.RollCallLeftRatio == .4 && quickSettings.RollCallTopRatio == .6,
+            "Quick window position and optional break restriction survive restart serialization");
+        Check(!new RollCallOptions().DisableDuringBreak && !new RollCallOptions().FloatingWindow, "New optional roll-call features preserve legacy defaults");
         Check(System.Text.Json.JsonSerializer.Deserialize<WidgetSettings>("{}")!.LauncherStyle == LauncherStyles.Label, "Legacy settings retain the labeled handle");
         Check(!System.Text.Json.JsonSerializer.Deserialize<WidgetSettings>("{}")!.DynamicResizeAnimation, "Legacy settings disable live resize animation by default");
+        Check(!System.Text.Json.JsonSerializer.Deserialize<WidgetSettings>("{}")!.SettingsTabAnimation, "Legacy settings keep optional tab motion disabled");
+        var independentEffects = System.Text.Json.JsonSerializer.Deserialize<WidgetSettings>(System.Text.Json.JsonSerializer.Serialize(new WidgetSettings { SettingsTabAnimation = true, DynamicResizeAnimation = false }))!;
+        Check(independentEffects.SettingsTabAnimation && !independentEffects.DynamicResizeAnimation, "Visual effects can be saved independently without enabling resize motion");
         Check(!System.Text.Json.JsonSerializer.Deserialize<WidgetSettings>(System.Text.Json.JsonSerializer.Serialize(new WidgetSettings { DynamicResizeAnimation=false }))!.DynamicResizeAnimation, "Disabled resize animation survives settings serialization");
         Check(LauncherStyles.Normalize("unknown") == LauncherStyles.Label, "Unknown handle style falls back without discarding settings");
         foreach (var style in new[] { LauncherStyles.Label, LauncherStyles.Slim, LauncherStyles.Arrow })

@@ -36,11 +36,14 @@ public sealed class SeatPlan
 }
 public sealed class WidgetSettings
 {
-    public string ServerUrl { get; set; } = "http://localhost:5173";
+    public string ServerUrl { get; set; } = "";
     public double ButtonTopRatio { get; set; } = 0.42;
     public double PanelWidth { get; set; } = 920;
     public string LauncherStyle { get; set; } = LauncherStyles.Label;
     public bool DynamicResizeAnimation { get; set; } = false;
+    public bool SettingsTabAnimation { get; set; } = false;
+    public double RollCallLeftRatio { get; set; } = 0.85;
+    public double RollCallTopRatio { get; set; } = 0.7;
     public RollCallOptions RollCall { get; set; } = new();
 }
 public static class LauncherStyles
@@ -63,9 +66,11 @@ internal static class LocalStore
         try
         {
             var settings = JsonSerializer.Deserialize<WidgetSettings>(File.ReadAllText(Path.Combine(Folder, "settings.json")), Json) ?? new();
-            settings.ServerUrl = SeatApi.Normalize(settings.ServerUrl);
+            settings.ServerUrl = string.IsNullOrWhiteSpace(settings.ServerUrl) ? "" : SeatApi.Normalize(settings.ServerUrl);
             settings.ButtonTopRatio = double.IsFinite(settings.ButtonTopRatio) ? Math.Clamp(settings.ButtonTopRatio, 0, 1) : 0.42;
             settings.PanelWidth = double.IsFinite(settings.PanelWidth) ? Math.Clamp(settings.PanelWidth, 480, 1800) : 920;
+            settings.RollCallLeftRatio = double.IsFinite(settings.RollCallLeftRatio) ? Math.Clamp(settings.RollCallLeftRatio, 0, 1) : 0.85;
+            settings.RollCallTopRatio = double.IsFinite(settings.RollCallTopRatio) ? Math.Clamp(settings.RollCallTopRatio, 0, 1) : 0.7;
             settings.LauncherStyle = LauncherStyles.Normalize(settings.LauncherStyle);
             settings.RollCall ??= new();
             try { settings.RollCall.Validate(); } catch { settings.RollCall = new(); }

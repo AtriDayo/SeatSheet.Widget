@@ -32,6 +32,7 @@ public partial class PanelWindow : Window
     public PanelWindow()
     {
         InitializeComponent();
+        InitializeRollCallAvailability();
         SourceInitialized += (_, _) => Native.MakeToolWindow(new WindowInteropHelper(this).Handle);
         Closing += OnClosing;
         geometryTimer.Tick += (_, _) => { if (IsVisible && !motionActive && !resizeActive) Position(); };
@@ -42,6 +43,8 @@ public partial class PanelWindow : Window
             Render(cached.Plan);
             Status("显示上次保存的座位表，打开时自动刷新", false);
         }
+        else if (string.IsNullOrWhiteSpace(App.Settings.ServerUrl))
+            Status("尚未配置网站，请在设置中连接你的班级座位表。", false);
     }
     public void Toggle()
     {
@@ -149,6 +152,13 @@ public partial class PanelWindow : Window
     {
         if (loading) return;
         var source = App.Settings.ServerUrl;
+        if (string.IsNullOrWhiteSpace(source))
+        {
+            Status("尚未配置网站，请在设置中连接你的班级座位表。", false);
+            EmptyTitle.Text = "请先在设置中连接班级座位表";
+            if (App.IsSmoke) await SmokeCapture();
+            return;
+        }
         loading = true;
         RefreshButton.IsEnabled = false;
         ConnectionStatus.Text = "正在获取最新座位表…";
@@ -190,7 +200,7 @@ public partial class PanelWindow : Window
     private void Status(string message, bool online)
     {
         connectionOnline = online;
-        connectionSummary = online ? "已连接 · 打开面板时自动刷新" : cached != null ? "离线 · 使用最近的座位表" : "未连接 · 请检查设置";
+        connectionSummary = online ? "已连接 · 打开面板时自动刷新" : string.IsNullOrWhiteSpace(App.Settings.ServerUrl) ? "尚未配置 · 请打开设置" : cached != null ? "离线 · 使用最近的座位表" : "未连接 · 请检查设置";
         ConnectionDetails.Text = message;
         RestoreConnectionSummary();
         if (cached != null) UpdatePlanMetadata(cached.Plan);
@@ -260,13 +270,19 @@ public partial class PanelWindow : Window
         boardWidth = 116 + plan.Columns * 148 + aisles.Length * 30;
         boardHeight = plan.Rows * 98;
         Board.Width = boardWidth; Board.Height = boardHeight;
+        SetBoardScale(BoardScale.ScaleX);
         Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(ApplyFit));
     }
     private void ApplyFit()
     {
         if (!fit || boardWidth <= 0 || BoardScroll.ActualWidth <= 0) return;
         var scale = Math.Clamp(Math.Min((BoardScroll.ActualWidth - 20) / boardWidth, (BoardScroll.ActualHeight - 20) / boardHeight), 0.25, 1.3);
+        SetBoardScale(scale);
+    }
+    private void SetBoardScale(double scale)
+    {
         BoardScale.ScaleX = BoardScale.ScaleY = scale;
+        BoardExtent.Width = boardWidth * scale; BoardExtent.Height = boardHeight * scale;
     }
     public void ShowSettings()
     {
@@ -275,6 +291,7 @@ public partial class PanelWindow : Window
         settingsWindow.Saved += async (_, _) =>
         {
             SettingsSaved?.Invoke(this, EventArgs.Empty);
+            ApplyFloatingRollCall();
             cached = LocalStore.ReadCache(App.Settings.ServerUrl);
             if (cached != null) Render(cached.Plan);
             else { Board.Children.Clear(); PlanTitle.Text = "座位表"; PlanStats.Text = "连接你的班级，随时查看座位"; EmptyState.Visibility = Visibility.Visible; EmptyTitle.Text = "正在获取座位表…"; UpdatedLabel.Text = ""; }
@@ -284,6 +301,11 @@ public partial class PanelWindow : Window
         };
         settingsWindow.Closed += (_, _) => settingsWindow = null;
         settingsWindow.Show();
+    }
+    internal void ShowRollCallSettings()
+    {
+        ShowSettings();
+        settingsWindow!.SettingsTabs.SelectedIndex = 1;
     }
     private void OnClosing(object? sender, CancelEventArgs e)
     {
@@ -295,13 +317,14 @@ public partial class PanelWindow : Window
     private async void RefreshClick(object sender, RoutedEventArgs e) => await Refresh();
     private void CollapseClick(object sender, RoutedEventArgs e) => Collapse();
     private void FitClick(object sender, RoutedEventArgs e) { fit = true; ApplyFit(); }
-    private void ZoomOutClick(object sender, RoutedEventArgs e) { fit = false; BoardScale.ScaleX = BoardScale.ScaleY = Math.Clamp(BoardScale.ScaleX / 1.15, .25, 2); }
-    private void ZoomInClick(object sender, RoutedEventArgs e) { fit = false; BoardScale.ScaleX = BoardScale.ScaleY = Math.Clamp(BoardScale.ScaleX * 1.15, .25, 2); }
+    private void ZoomOutClick(object sender, RoutedEventArgs e) { fit = false; SetBoardScale(Math.Clamp(BoardScale.ScaleX / 1.15, .25, 2)); }
+    private void ZoomInClick(object sender, RoutedEventArgs e) { fit = false; SetBoardScale(Math.Clamp(BoardScale.ScaleX * 1.15, .25, 2)); }
     private void ExpandClick(object sender, RoutedEventArgs e) => ToggleExpansion();
     private void BoardSizeChanged(object sender, SizeChangedEventArgs e) => ApplyFit();
     private void SettingsClick(object sender, RoutedEventArgs e) => ShowSettings();
     private void ManageClick(object sender, RoutedEventArgs e)
     {
+        if (string.IsNullOrWhiteSpace(App.Settings.ServerUrl)) { ShowSettings(); return; }
         try { Process.Start(new ProcessStartInfo(App.Settings.ServerUrl + "/config") { UseShellExecute = true }); }
         catch { ConnectionStatus.Text = "无法打开管理页面 · 查看详情"; ConnectionDetails.Text = "无法打开浏览器，请手动访问网站的 /config 页面。"; }
     }

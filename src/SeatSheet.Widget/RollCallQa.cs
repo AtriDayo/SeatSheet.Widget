@@ -16,6 +16,8 @@ public partial class PanelWindow
         Directory.CreateDirectory(App.SmokeFolder!);
         try
         {
+            App.Settings.ServerUrl = "http://localhost:18764";
+            App.LessonProbe = () => Task.FromResult(LessonAvailability.Unknown);
             cached = new CachedPlan { Source = App.Settings.ServerUrl, FetchedAt=DateTimeOffset.Now, Plan = new SeatPlan { Name = "示例班级", Rows = 2, Columns = 3, UpdatedAt=DateTimeOffset.UtcNow,
                 Seats = new() { new() { Name="示例甲",StudentNo="01" },new() { Name="示例乙",StudentNo="02",Column=1 },
                     new() {Name="示例丙",StudentNo="03",Row=1},new() {Row=1,Column=1,Name=" "} } } };
@@ -57,10 +59,57 @@ public partial class PanelWindow
             PlanTitle.Text="示例班级：用于检查较长标题是否挤压工具栏";
             CaptureRollCallView(PanelSurface,"classroom-panel-narrow");
             App.Settings.PanelWidth=previousWidth; Position(); Render(cached.Plan);
+            ApplyFloatingRollCall();
+            if (floatingWindow == null || !floatingWindow.IsVisible) throw new InvalidOperationException("Saved floating option did not create the quick roll-call window.");
+            CaptureRollCallView(floatingWindow, "rollcall-floating");
+            if (floatingWindow.Width != 64 || floatingWindow.Height != 44 || floatingWindow.DrawButton.ActualWidth != floatingWindow.DrawButton.ActualHeight)
+                throw new InvalidOperationException("Quick roll-call window is not compact with a square button.");
+            App.LessonProbe = () => Task.FromResult(new LessonAvailability(true, "当前为课间，已禁用点名。"));
+            await RefreshRollCallAvailabilityAsync();
+            if (floatingWindow.DrawButton.IsEnabled || RollCallButton.IsEnabled)
+                throw new InvalidOperationException("Known break did not disable both roll-call buttons.");
+            CaptureRollCallView(floatingWindow, "rollcall-floating-paused");
+            floatingWindow.DrawButton.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
+            await Task.Delay(80);
+            if (lastRollCall != null || resultWindow != null || !RollCallStatus.Text.Contains("课间"))
+                throw new InvalidOperationException("Floating action drew or displayed a result during a break.");
+            // Only one eligible student proves a blocked request does not consume the no-repeat round.
+            var originalRules = App.Settings.RollCall.Clone();
+            var oneStudent = RollCallRoster.Create(App.Settings.ServerUrl, cached.Plan, App.Settings.RollCall);
+            foreach (var participant in oneStudent) { participant.Absent = false; participant.Weight = participant.Name == "示例甲" ? 1 : 0; }
+            RollCallRoster.SaveRules(App.Settings.ServerUrl, cached.Plan, oneStudent, App.Settings.RollCall);
+            await DrawStudentAsync();
+            App.LessonProbe = () => Task.FromResult(LessonAvailability.Unknown);
             await DrawStudentAsync();
             if(lastRollCall?.Student?.Name=="示例乙" || resultWindow==null) throw new InvalidOperationException("Absent student or missing local result.");
+            if (lastRollCall?.Student?.Name != "示例甲") throw new InvalidOperationException("Blocked break consumed the only eligible student.");
+            if (!floatingWindow.DrawButton.IsEnabled || !RollCallButton.IsEnabled || !resultWindow.NextButton.IsEnabled)
+                throw new InvalidOperationException("Unknown course state did not restore roll-call buttons.");
+            var retainedId = lastRollCall.MessageId;
+            App.LessonProbe = () => Task.FromResult(new LessonAvailability(true, "当前为课间，已禁用点名。"));
+            await RefreshRollCallAvailabilityAsync();
+            if (resultWindow.NextButton.IsEnabled) throw new InvalidOperationException("Break did not disable result window next action.");
+            await DrawStudentAsync(); await RetryRollCallAsync();
+            if (lastRollCall.MessageId != retainedId || !RollCallStatus.Text.Contains("课间")) throw new InvalidOperationException("Break changed or resent the original result.");
+            App.Settings.RollCall.DisableDuringBreak = false; SynchronizeRollCallAvailability();
+            if (!floatingWindow.DrawButton.IsEnabled || !resultWindow.NextButton.IsEnabled)
+                throw new InvalidOperationException("Turning off the restriction did not immediately restore buttons.");
+            var delayedProbe = new TaskCompletionSource<LessonAvailability>();
+            App.Settings.RollCall.DisableDuringBreak = true;
+            App.LessonProbe = () => delayedProbe.Task;
+            var pendingAvailability = RefreshRollCallAvailabilityAsync();
+            App.Settings.RollCall.DisableDuringBreak = false; SynchronizeRollCallAvailability();
+            delayedProbe.SetResult(new LessonAvailability(true, "课间")); await pendingAvailability;
+            if (!floatingWindow.DrawButton.IsEnabled) throw new InvalidOperationException("A late probe re-disabled buttons after the option was turned off.");
+            App.Settings.RollCall = originalRules;
+            App.LessonProbe = () => Task.FromResult(LessonAvailability.Unknown);
+            await RefreshRollCallAvailabilityAsync();
             CaptureRollCallView(resultWindow,"rollcall-result");
             resultWindow.Close();
+            floatingWindow.Close(); ApplyFloatingRollCall();
+            if (floatingWindow == null || !floatingWindow.IsVisible) throw new InvalidOperationException("Floating window could not be reopened after hiding.");
+            App.Settings.RollCall.FloatingWindow = false; ApplyFloatingRollCall();
+            if (floatingWindow != null) throw new InvalidOperationException("Disabling the floating window left it visible.");
             App.UseIsolatedNotificationsForQa();
             App.Settings.RollCall.Output = "classIsland";
             App.RollCall.ResetRound();
@@ -79,7 +128,7 @@ public partial class PanelWindow
             CaptureRollCallView(resultWindow,"rollcall-long-text");
             resultWindow.Close();
             File.WriteAllText(Path.Combine(App.SmokeFolder!,"rollcall-result.json"),JsonSerializer.Serialize(new {passed=true,
-                checks=new[] {"settings opening and closing settle","full classroom at three render scales","wide and narrow layout snapshots","long result text snapshot","draft output updates connection controls","settings cancel preserves draft","offline settings save","empty seat filtering","absent student exclusion","transparent rounded local result window","compact connection summary","metadata beside row and column counts","external failure falls back to local","retry preserves result ID"}}));
+                checks=new[] {"settings opening and closing settle","full classroom at three render scales","wide and narrow layout snapshots","long result text snapshot","draft output updates connection controls","settings cancel preserves draft","offline settings save with floating and break flags","empty seat filtering","absent student exclusion","transparent rounded local result window","compact connection summary","metadata beside row and column counts","floating action uses the shared break gate","blocked break cannot consume the only eligible student","break preserves result ID and suppresses retry","unknown course state allows local roll call","floating hide reopen and disable","external failure falls back to local","retry preserves result ID"}}));
             Application.Current.Shutdown();
         }
         catch(Exception ex)

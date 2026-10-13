@@ -1,0 +1,88 @@
+name: Prepare product prerelease
+
+on:
+  push:
+    tags: ['widget-v*', 'plugin-v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-2022
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      DOTNET_NOLOGO: 'true'
+      DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+    steps:
+      - name: Checkout tagged source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Set up .NET 8 SDK
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '8.0.x'
+      - name: Validate tag, version and stable ancestry
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          git merge-base --is-ancestor HEAD origin/stable
+          if ($LASTEXITCODE -ne 0) { throw 'Release tags must point to a commit already included in stable.' }
+          $product = if ($env:RELEASE_TAG.StartsWith('widget-v')) { 'widget' } else { 'plugin' }
+          $version = ./dev/check-release-version.ps1 -Product $product -Tag $env:RELEASE_TAG
+          "RELEASE_PRODUCT=$product" >> $env:GITHUB_ENV
+          "RELEASE_VERSION=$version" >> $env:GITHUB_ENV
+      - name: Check core and official IPC
+        run: |
+          dotnet run --project tests/SeatSheet.Widget.Checks -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'Core checks failed.' }
+          dotnet run --project tests/SeatSheet.ClassIslandPlugin.Checks -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'Plugin/client checks failed.' }
+      - name: Package selected product
+        run: |
+          if ($env:RELEASE_PRODUCT -eq 'widget') {
+            ./dev/publish-widget.ps1
+            $artifact = 'artifacts/widget/win-x64/SeatSheet.Widget.exe'
+          } else {
+            dotnet build src/SeatSheet.ClassIslandPlugin -c Release -p:PackagePlugin=true
+            if ($LASTEXITCODE -ne 0) { throw 'Plugin package build failed.' }
+            $artifact = 'artifacts/plugin/SeatSheet.ClassIslandPlugin.cipx'
+          }
+          ./dev/check-release-version.ps1 -Product $env:RELEASE_PRODUCT -Tag $env:GITHUB_REF_NAME -Artifact $artifact
+          "RELEASE_ARTIFACT=$artifact" >> $env:GITHUB_ENV
+      - name: Create prerelease draft for review
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          $label = if ($env:RELEASE_PRODUCT -eq 'widget') { '桌面版' } else { 'ClassIsland 插件' }
+          $usage = if ($env:RELEASE_PRODUCT -eq 'widget') {
+            '适用于 Windows 10 / 11 x64。下载 EXE 直接运行，无需另行安装 .NET。首次使用请填写 SeatSheet 网站地址。ClassIsland 插件可选，需单独下载。'
+          } else {
+            '适用于 ClassIsland 2.1.0.1。下载 CIPX，在插件管理中从文件安装并重启。名单、权重和抽取规则由 SeatSheet 桌面软件管理。'
+          }
+          $hash = (Get-FileHash -LiteralPath $env:RELEASE_ARTIFACT -Algorithm SHA256).Hash.ToLowerInvariant()
+          $notes = @"
+          SeatSheet $label ${env:RELEASE_VERSION}，预发布测试版。
+
+          $usage
+
+          <!-- 发布前补充本产品的更新说明，并更新 README 与应用下载入口。 -->
+
+          Commit: $env:GITHUB_SHA
+          SHA256: $hash
+          "@
+          $notesPath = Join-Path $env:RUNNER_TEMP 'seatsheet-release-notes.md'
+          $notes | Set-Content -LiteralPath $notesPath -Encoding utf8
+          gh release create $env:GITHUB_REF_NAME $env:RELEASE_ARTIFACT --verify-tag --draft --prerelease --latest=false --title "SeatSheet $label $env:RELEASE_VERSION" --notes-file $notesPath
+          if ($LASTEXITCODE -ne 0) { throw 'Release draft creation failed; existing releases are not overwritten.' }

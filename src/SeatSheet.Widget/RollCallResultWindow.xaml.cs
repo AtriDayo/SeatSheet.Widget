@@ -21,7 +21,13 @@ public partial class RollCallResultWindow : Window
         RetryButton.Visibility = external ? Visibility.Visible : Visibility.Collapsed;
     }
     public void SetStatus(string status) => DeliveryState.Text = status;
-    public void SetBusy(bool busy) { NextButton.IsEnabled = !busy; RetryButton.IsEnabled = !busy && external; }
+    public void SetAvailability(bool busy, bool paused)
+    {
+        NextButton.IsEnabled = !busy && !paused; RetryButton.IsEnabled = !busy && !paused && external;
+        NextButton.ToolTip = RetryButton.ToolTip = paused ? "当前为课间，已禁用点名；上课后自动恢复。" : null;
+        System.Windows.Controls.ToolTipService.SetShowOnDisabled(NextButton, true);
+        System.Windows.Controls.ToolTipService.SetShowOnDisabled(RetryButton, true);
+    }
     private async void NextClick(object sender, RoutedEventArgs e) => await _next();
     private async void RetryClick(object sender, RoutedEventArgs e) => await _retry();
     private void CloseClick(object sender, RoutedEventArgs e) => Close();

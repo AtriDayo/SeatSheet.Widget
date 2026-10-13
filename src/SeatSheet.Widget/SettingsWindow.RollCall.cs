@@ -21,6 +21,8 @@ public partial class SettingsWindow
     {
         RollCallOutput.SelectedIndex = rollCallDraft.Output == "both" ? 2 : rollCallDraft.Output == "classIsland" ? 1 : 0;
         NoRepeatOption.IsChecked = rollCallDraft.NoRepeat;
+        FloatingRollCallOption.IsChecked = rollCallDraft.FloatingWindow;
+        DisableBreakOption.IsChecked = rollCallDraft.DisableDuringBreak;
         LoadRoster(plan);
         pluginStatusTimer.Tick += (_, _) => UpdatePluginStatus();
         Loaded += (_, _) => { UpdatePluginStatus(); pluginStatusTimer.Start(); };
@@ -35,7 +37,7 @@ public partial class SettingsWindow
     {
         if (PluginConnection == null || ProbePluginButton == null) return;
         var external = RollCallOutput.SelectedIndex > 0;
-        PluginConnection.Text = !external ? "本软件显示，无需连接 ClassIsland"
+        PluginConnection.Text = !external ? "本软件显示，无需通知插件"
             : App.Settings.RollCall.Output == "widget" ? draftProbeStatus ?? "尚未检查 ClassIsland 插件"
             : App.Notifications.Status;
         if (probingPlugin) PluginConnection.Text = "正在检查 ClassIsland 插件…";
@@ -44,10 +46,8 @@ public partial class SettingsWindow
     }
     private void SettingsTabChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (e.OriginalSource != SettingsTabs || SettingsDescription == null) return;
-        SettingsDescription.Text = SettingsTabs.SelectedIndex == 1
-            ? "管理参与名单、抽取权重和点名结果的显示位置。"
-            : "连接班级座位表，调整适合课堂使用的显示大小。";
+        if (e.OriginalSource != SettingsTabs) return;
+        RequestSettingsTabTransition();
     }
     private void LoadRoster(CachedPlan? plan)
     {
@@ -63,6 +63,8 @@ public partial class SettingsWindow
         if (rosterPlan != null) RollCallRoster.SaveRules(rosterPlan.Source, rosterPlan.Plan, participants, rollCallDraft);
         rollCallDraft.Output = RollCallOutput.SelectedIndex == 2 ? "both" : RollCallOutput.SelectedIndex == 1 ? "classIsland" : "widget";
         rollCallDraft.NoRepeat = NoRepeatOption.IsChecked == true;
+        rollCallDraft.FloatingWindow = FloatingRollCallOption.IsChecked == true;
+        rollCallDraft.DisableDuringBreak = DisableBreakOption.IsChecked == true;
         rollCallDraft.Validate();
     }
     private static bool HasValidationError(DependencyObject element)
@@ -74,6 +76,11 @@ public partial class SettingsWindow
     }
     private async void RefreshRosterClick(object sender, RoutedEventArgs e)
     {
+        if (string.IsNullOrWhiteSpace(App.Settings.ServerUrl))
+        {
+            RollCallSettingsMessage.Text = "请先在常规页填写网站地址并保存，再更新名单。";
+            return;
+        }
         var button = (Button)sender; button.IsEnabled = false;
         try
         {
@@ -102,6 +109,18 @@ public partial class SettingsWindow
         resetRound = true;
         RollCallSettingsMessage.Text = "点击保存设置后重置本轮；取消不会重置。";
     }
+    private void BreakOptionChanged(object sender, RoutedEventArgs e)
+    {
+        if (CheckLessonButton == null) return;
+        CheckLessonButton.IsEnabled = DisableBreakOption.IsChecked == true;
+        LessonStateText.Text = DisableBreakOption.IsChecked == true ? "启用后每次点名前检查；仅已确认的课间禁用。" : "未启用课间限制";
+    }
+    private async void CheckLessonClick(object sender, RoutedEventArgs e)
+    {
+        CheckLessonButton.IsEnabled = false; LessonStateText.Text = "正在检查 ClassIsland 课程状态…";
+        try { var state = await App.LessonProbe(); if (!closed) LessonStateText.Text = state.Description; }
+        finally { if (!closed) CheckLessonButton.IsEnabled = DisableBreakOption.IsChecked == true; }
+    }
     internal async Task VerifyRollCallDraftForSmoke(bool save)
     {
         if (!App.IsSmoke) throw new InvalidOperationException("Requires isolated QA.");
@@ -109,12 +128,14 @@ public partial class SettingsWindow
         participants[0].Weight = 3;
         participants[1].Absent = true;
         NoRepeatOption.IsChecked = true;
+        FloatingRollCallOption.IsChecked = true;
+        DisableBreakOption.IsChecked = true;
         if (save)
         {
             var saved = false;
             Saved += (_, _) => saved = true;
             await CheckConnection(true);
-            if (!saved || !App.Settings.RollCall.NoRepeat ||
+            if (!saved || !App.Settings.RollCall.NoRepeat || !App.Settings.RollCall.FloatingWindow || !App.Settings.RollCall.DisableDuringBreak ||
                 App.Settings.RollCall.Classes[RollCallRoster.Scope(rosterPlan!.Source, rosterPlan.Plan)][participants[0].Id].Weight != 3)
                 throw new InvalidOperationException("Roll-call draft did not save.");
         }

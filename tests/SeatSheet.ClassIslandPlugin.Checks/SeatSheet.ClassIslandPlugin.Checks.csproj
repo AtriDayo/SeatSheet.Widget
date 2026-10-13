@@ -7,6 +7,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../../src/SeatSheet.Widget/ClassIslandRollCallClient.cs" Link="Client/ClassIslandRollCallClient.cs" />
+    <Compile Include="../../src/SeatSheet.Widget/ClassIslandLessonClient.cs" Link="Client/ClassIslandLessonClient.cs" />
     <PackageReference Include="ClassIsland.Shared.IPC" Version="2.1.0.1" />
     <ProjectReference Include="../../src/SeatSheet.RollCall.Protocol/SeatSheet.RollCall.Protocol.csproj" />
     <PackageReference Include="dotnetCampus.Ipc" Version="2.0.0-alpha410" />

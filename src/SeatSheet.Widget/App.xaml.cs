@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using Forms = System.Windows.Forms;
 
@@ -22,6 +23,7 @@ public partial class App : Application
     internal static WidgetSettings Settings { get; private set; } = new();
     internal static RollCallEngine RollCall { get; } = new();
     internal static ClassIslandRollCallClient Notifications { get; private set; } = new();
+    internal static Func<Task<LessonAvailability>> LessonProbe { get; set; } = new ClassIslandLessonClient().ReadAsync;
     internal static void UseIsolatedNotificationsForQa()
     {
         if (!IsSmoke) throw new InvalidOperationException("Requires isolated QA.");
@@ -33,9 +35,10 @@ public partial class App : Application
         base.OnStartup(e);
         var appearanceQa = e.Args.Contains("--appearance-qa");
         var rollCallQa = e.Args.Contains("--rollcall-qa");
+        var tabMotionQa = e.Args.Contains("--tab-motion-qa");
         IsExpansionQa = e.Args.Contains("--expand-qa");
         IsMotionQa = e.Args.Contains("--motion-qa") || IsExpansionQa;
-        IsSmoke = e.Args.Contains("--smoke") || IsMotionQa || appearanceQa || rollCallQa;
+        IsSmoke = e.Args.Contains("--smoke") || IsMotionQa || appearanceQa || rollCallQa || tabMotionQa;
         CompactSmoke = e.Args.Contains("--compact");
         if (IsSmoke) SmokeFolder = Path.Combine(AppContext.BaseDirectory, "qa");
         mutex = new Mutex(true, IsSmoke ? "SeatSheet.Widget.Smoke" : "SeatSheet.Widget.Desktop", out var first);
@@ -55,16 +58,19 @@ public partial class App : Application
             menu.Items.Add("查看座位表", null, (_, _) => Dispatcher.Invoke(() => panel.Open()));
             menu.Items.Add("显示 / 隐藏按钮", null, (_, _) => Dispatcher.Invoke(() => { if (launcher.IsVisible) launcher.Hide(); else launcher.Show(); }));
             menu.Items.Add("设置", null, (_, _) => Dispatcher.Invoke(() => panel.ShowSettings()));
+            menu.Items.Add("显示点名悬浮窗", null, (_, _) => Dispatcher.Invoke(() => { if (Settings.RollCall.FloatingWindow) panel.ApplyFloatingRollCall(); else panel.ShowRollCallSettings(); }));
             menu.Items.Add("退出", null, (_, _) => Dispatcher.Invoke(Shutdown));
             tray.ContextMenuStrip = menu;
             tray.DoubleClick += (_, _) => Dispatcher.Invoke(() => panel.Open());
         }
         launcher.Show();
-        if (rollCallQa) _ = panel.CheckRollCallUiAsync();
+        if (!IsSmoke) panel.ApplyFloatingRollCall();
+        if (tabMotionQa) _ = CheckSettingsTabMotion();
+        else if (rollCallQa) _ = panel.CheckRollCallUiAsync();
         else if (appearanceQa) _ = CheckAppearance();
         else if (IsExpansionQa) _ = panel.CheckExpansion();
         else if (IsMotionQa) _ = panel.CheckMotion();
-        else if (e.Args.Contains("--settings")) panel.ShowSettings();
+        else if (e.Args.Contains("--settings") || (!IsSmoke && string.IsNullOrWhiteSpace(Settings.ServerUrl))) panel.ShowSettings();
         else if (IsSmoke || e.Args.Contains("--open")) panel.Open();
     }
     protected override void OnExit(ExitEventArgs e)

@@ -1,5 +1,8 @@
 using System;
 using System.IO;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows;
@@ -15,6 +18,7 @@ public partial class PanelWindow
     private int resizeVersion;
     private Rect resizeFrom, resizeTo, resizeCurrent, resizeWork;
     private double radiusFrom, radiusTo, radiusCurrent;
+    private readonly RectangleGeometry expansionClip = new();
     private static readonly DependencyProperty ExpansionProgressProperty = DependencyProperty.Register(
         "ExpansionProgress", typeof(double), typeof(PanelWindow), new PropertyMetadata(0.0, (owner, _) => ((PanelWindow)owner).UpdateExpansionFrame()));
     private double ExpansionProgress { get => (double)GetValue(ExpansionProgressProperty); set => SetValue(ExpansionProgressProperty, value); }
@@ -73,8 +77,7 @@ public partial class PanelWindow
             return;
         }
         var animation = MotionAnimation(0, 1, TimeSpan.FromMilliseconds(expanded ? 380 : 320), new KeySpline(.16, .80, .22, 1));
-        // Layout animation uses the UI thread; bound its update rate on older classroom PCs.
-        Timeline.SetDesiredFrameRate(animation, 30);
+        // WPF's rendering clock drives transitions without the old 30 fps cap.
         animation.Completed += (_, _) => { if (version == resizeVersion) FinishExpansion(); };
         BeginAnimation(ExpansionProgressProperty, animation);
     }
@@ -89,9 +92,10 @@ public partial class PanelWindow
         MotionRoot.Height = resizeCurrent.Height;
         MotionRoot.Margin = new Thickness(resizeCurrent.X - resizeWork.X, resizeCurrent.Y - resizeWork.Y, 0, 0);
         PanelSurface.CornerRadius = new CornerRadius(radiusCurrent);
-        MotionRoot.Clip = new RectangleGeometry(new Rect(0, 0, resizeCurrent.Width, resizeCurrent.Height), radiusCurrent, radiusCurrent);
-        UpdateLayout();
-        ApplyFit();
+        expansionClip.Rect = new Rect(0, 0, resizeCurrent.Width, resizeCurrent.Height);
+        expansionClip.RadiusX = expansionClip.RadiusY = radiusCurrent;
+        MotionRoot.Clip = expansionClip;
+        // Batch layout normally; BoardSizeChanged changes only the seat render transform.
     }
     private void FinishExpansion()
     {
@@ -121,6 +125,8 @@ public partial class PanelWindow
         Directory.CreateDirectory(App.SmokeFolder!);
         string? frameError = null;
         var checkedFrames = 0;
+        var intervals = new List<double>();
+        var lastVersion = -1; var lastProgress = -1.0; long lastTick = 0;
         EventHandler? monitor = null;
         try
         {
@@ -132,11 +138,24 @@ public partial class PanelWindow
             var floating = WindowBounds(false);
             var host = new Rect(Left, Top, Width, Height);
             var fontSize = PlanTitle.FontSize;
+            if (Board.RenderTransform != BoardScale || !Board.LayoutTransform.Value.IsIdentity)
+                throw new Exception("Seat scaling still invalidates the entire board layout.");
+            var boardClip = System.Windows.Controls.Primitives.LayoutInformation.GetLayoutClip(Board);
+            if (boardClip != null && (boardClip.Bounds.Width + 1 < boardWidth || boardClip.Bounds.Height + 1 < boardHeight))
+                throw new Exception("The scaled viewport clipped seats before the render transform.");
             var buttonSize = ExpandButton.RenderSize;
             monitor = (_, _) =>
             {
                 if (!resizeActive) return;
                 checkedFrames++;
+                var tick = Stopwatch.GetTimestamp();
+                if (lastVersion == resizeVersion && ExpansionProgress != lastProgress)
+                {
+                    var interval = (tick - lastTick) * 1000.0 / Stopwatch.Frequency;
+                    if (interval > 0 && interval < 100) intervals.Add(interval);
+                }
+                if (lastVersion != resizeVersion || ExpansionProgress != lastProgress)
+                { lastVersion = resizeVersion; lastProgress = ExpansionProgress; lastTick = tick; }
                 if (Math.Abs(Left-host.Left)>.01 || Math.Abs(Top-host.Top)>.01 || Math.Abs(Width-host.Width)>.01 || Math.Abs(Height-host.Height)>.01)
                     frameError = "Native host moved during expansion.";
                 if (MotionRoot.Visibility!=Visibility.Visible || MotionRoot.Opacity<.99 || MotionRoot.CacheMode!=null)
@@ -165,6 +184,10 @@ public partial class PanelWindow
                 throw new Exception("Maximum state did not fill the work area.");
             SaveExpansionCapture("expanded");
             ToggleExpansion(); await Task.Delay(500); SaveExpansionCapture("restored");
+            fit = false; SetBoardScale(1.8); UpdateLayout();
+            if (BoardScroll.ExtentWidth + 1 < boardWidth * 1.8 || Math.Abs(BoardExtent.Width - boardWidth * 1.8) > .1)
+                throw new Exception("Render scaling lost the scrollable seat extent.");
+            fit = true; ApplyFit();
             ToggleExpansion(); await Task.Delay(70); Collapse(); await Task.Delay(650);
             if (IsVisible || resizeActive || pendingCollapse) throw new Exception("Collapse during expansion failed.");
             Open(); await Task.Delay(450);
@@ -177,8 +200,11 @@ public partial class PanelWindow
             if (resizeActive || expanded) throw new Exception("Disabled restore did not switch immediately.");
             if (frameError!=null) throw new Exception(frameError);
             if (checkedFrames<5) throw new Exception("Too few rendered transition frames were checked.");
+            var sortedIntervals = intervals.OrderBy(x => x).ToArray();
             File.WriteAllText(Path.Combine(App.SmokeFolder!, "expansion-result.json"), JsonSerializer.Serialize(new {passed=true,compact=App.CompactSmoke,checkedFrames,
-                checks=new[] {"live layout per frame","uniform board scaling","stable text and button sizes","continuous reverse","restore bounds","maximum fills work area","collapse during resize","reopen","fixed native host","disabled animation switches immediately"}},LocalStore.Json));
+                renderingTier=RenderCapability.Tier >> 16, progressSamples=intervals.Count,
+                medianProgressIntervalMs=sortedIntervals.Length == 0 ? 0 : Math.Round(sortedIntervals[sortedIntervals.Length/2],2),
+                checks=new[] {"live layout per frame","render-only seat scaling without clipping","scroll extent preserved","uniform board scaling","stable text and button sizes","continuous reverse","restore bounds","maximum fills work area","collapse during resize","reopen","fixed native host","disabled animation switches immediately"}},LocalStore.Json));
             Application.Current.Shutdown();
         }
         catch (Exception ex)

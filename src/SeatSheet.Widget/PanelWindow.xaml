@@ -27,7 +27,7 @@
   <Border Grid.Row="2" Background="#E9EEFA" CornerRadius="7" Padding="12,8" Margin="0,0,0,16"><TextBlock Text="教 室 前 方" HorizontalAlignment="Center" Foreground="#536581" FontSize="12"/></Border>
   <Grid Grid.Row="3">
    <ScrollViewer x:Name="BoardScroll" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" SizeChanged="BoardSizeChanged">
-    <Grid x:Name="Board" HorizontalAlignment="Center" VerticalAlignment="Center"><Grid.LayoutTransform><ScaleTransform x:Name="BoardScale"/></Grid.LayoutTransform></Grid>
+    <Canvas x:Name="BoardExtent" HorizontalAlignment="Center" VerticalAlignment="Center"><Grid x:Name="Board" HorizontalAlignment="Left" VerticalAlignment="Top"><Grid.RenderTransform><ScaleTransform x:Name="BoardScale"/></Grid.RenderTransform></Grid></Canvas>
    </ScrollViewer>
    <StackPanel x:Name="EmptyState" VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="330">
     <ui:VectorIcon Icon="seats" Width="52" Height="52" Foreground="#245AE3" HorizontalAlignment="Center"/>

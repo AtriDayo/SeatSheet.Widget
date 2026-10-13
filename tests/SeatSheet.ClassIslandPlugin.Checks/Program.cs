@@ -6,6 +6,13 @@ using SeatSheet.ClassIslandPlugin.Services;
 using SeatSheet.ClassIslandPlugin.Presentation;
 using SeatSheet.RollCall.Protocol;
 
+if (args.Contains("--probe-classisland"))
+{
+    var state = await new SeatSheet.Widget.ClassIslandLessonClient().ReadAsync();
+    Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(state));
+    return;
+}
+
 var checks = 0;
 void Check(bool value, string label)
 {
@@ -214,7 +221,35 @@ var originalDesktopId = desktopMessage.MessageId;
 var offlineDelivery = await unavailableClient.SendAsync(desktopMessage).WaitAsync(TimeSpan.FromSeconds(8));
 Check(!offlineDelivery.Success && desktopMessage.MessageId == originalDesktopId,
     "Unavailable host returns a bounded notification failure");
+await CheckLessonContractAsync();
 Console.WriteLine($"{checks} total plugin/client checks passed.");
+
+async Task CheckLessonContractAsync()
+{
+    var lessonPipe = "SeatSheet.LessonChecks." + Guid.NewGuid().ToString("N");
+    using var lessonHost = new IpcProvider(lessonPipe);
+    var lessonState = new TestLessons();
+    dotnetCampus.Ipc.CompilerServices.GeneratedProxies.GeneratedIpcFactory.CreateIpcJoint<ClassIsland.Shared.IPC.Abstractions.Services.IPublicLessonsService>(lessonHost, lessonState);
+    lessonHost.StartServer();
+    var client = new SeatSheet.Widget.ClassIslandLessonClient(lessonPipe);
+    Check((await client.ReadAsync()).IsBreak, "Official 2.1.0.1 lesson proxy reads a confirmed break without a plugin");
+    var simultaneous = await Task.WhenAll(client.ReadAsync(), client.ReadAsync(), client.ReadAsync());
+    Check(simultaneous.All(state => state.IsBreak), "Concurrent settings and draw probes share the break result instead of bypassing it");
+    lessonState.CurrentState = ClassIsland.Shared.Enums.TimeState.OnClass;
+    Check(!(await client.ReadAsync()).IsBreak, "Official lesson proxy allows drawing in class");
+    lessonState.CurrentState = ClassIsland.Shared.Enums.TimeState.Breaking;
+    lessonState.IsClassPlanEnabled = false;
+    Check(!(await client.ReadAsync()).IsBreak, "Disabled schedules cannot lock roll call");
+    lessonState.IsClassPlanEnabled = true; lessonState.IsLessonConfirmed = false;
+    Check(!(await client.ReadAsync()).IsBreak, "Unconfirmed lesson state allows drawing");
+    lessonState.IsLessonConfirmed = true; lessonState.IsTimerRunning = false;
+    Check(!(await client.ReadAsync()).IsBreak, "Stopped lesson timer cannot leave a stale break lock");
+    var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+    Check(!(await new SeatSheet.Widget.ClassIslandLessonClient("SeatSheet.MissingLesson." + Guid.NewGuid().ToString("N")).ReadAsync()).IsBreak && stopwatch.ElapsedMilliseconds < 2000,
+        "Unavailable ClassIsland allows drawing within a bounded deadline");
+    Check(!SeatSheet.Widget.LessonAvailability.FromState(true,true,true,true,ClassIsland.Shared.Enums.TimeState.Breaking,ClassIsland.Shared.Enums.TimeState.OnClass).IsBreak,
+        "A changing state cannot incorrectly lock drawing");
+}
 
 sealed class TestClock(DateTimeOffset now) : TimeProvider
 {
