@@ -33,6 +33,7 @@ public partial class PanelWindow
             var motion = new SettingsWindow(cached); motion.Show(); await motion.VerifyMotionForSmoke();
             var canceled = new SettingsWindow(cached); canceled.Show(); await canceled.VerifyRollCallDraftForSmoke(false);
             var settings = new SettingsWindow(cached); settings.Show(); settings.SettingsTabs.SelectedIndex=1;
+            settings.OptionsButton.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
             settings.RollCallOutput.SelectedIndex=1;
             if (!settings.ProbePluginButton.IsEnabled || settings.PluginConnection.Text.Contains("无需连接"))
                 throw new InvalidOperationException("Draft external output did not update connection controls.");
@@ -40,6 +41,7 @@ public partial class PanelWindow
             settings.RollCallOutput.SelectedIndex=0;
             if (settings.ProbePluginButton.IsEnabled) throw new InvalidOperationException("Local output still enables plugin probing.");
             settings.NoRepeatOption.IsChecked=true;
+            settings.ReturnToRosterButton.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
             await Task.Delay(250); CaptureRollCallView(settings,"rollcall-settings");
             CaptureRollCallView(settings,"rollcall-settings-125",1.25);
             CaptureRollCallView(settings,"rollcall-settings-150",1.5);
@@ -51,7 +53,7 @@ public partial class PanelWindow
             Render(cached.Plan);
             Position(); MotionRoot.Opacity=1; Show(); await Task.Delay(80); UpdateLayout(); ApplyFit();
             Status("已连接 · 打开面板时自动刷新",true);
-            if (UpdatedLabel.Parent != PlanMetadata || !ConnectionStatus.Text.StartsWith("已连接"))
+            if (UpdatedLabel.Parent != ConnectionDetails.Parent || !ConnectionStatus.Text.StartsWith("已连接"))
                 throw new InvalidOperationException("Panel metadata or compact connection summary is misplaced.");
             CaptureRollCallView(PanelSurface,"classroom-panel");
             var previousWidth=App.Settings.PanelWidth;

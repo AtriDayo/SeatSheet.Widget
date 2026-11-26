@@ -27,7 +27,8 @@ public partial class PanelWindow
         var work = SystemParameters.WorkArea;
         return App.IsSmoke && App.CompactSmoke ? new Rect(work.Right - 1366, work.Top, 1366, 720) : work;
     }
-    private double FloatingRadius() => Math.Clamp(Math.Min(WorkArea().Width, WorkArea().Height) * .018, 12, 24);
+    // 16 DIP from the panel edge to the button, plus its 8 DIP corner.
+    private const double FloatingRadius = 24;
     private Rect WindowBounds(bool large)
     {
         var work = WorkArea();
@@ -36,8 +37,37 @@ public partial class PanelWindow
         var available = Math.Max(1, work.Width - gap * 2);
         var minimum = Math.Min(480, available);
         var width = Math.Clamp(App.Settings.PanelWidth, minimum, Math.Max(minimum, available * .72));
-        var height = Math.Min(720, work.Height * .80);
+        var height = Math.Min(FloatingContentHeight(width), work.Height * .80);
         return new Rect(work.Right - width - Math.Max(gap, 36), work.Top + (work.Height - height) / 2, width, height);
+    }
+    private double FloatingContentHeight(double width)
+    {
+        // Floating cards have a 10 DIP shadow allowance on each edge, including
+        // when measuring the restore target while the expanded card is borderless.
+        var inset = PanelContent.Margin;
+        var edge = PanelSurface.BorderThickness;
+        var innerWidth = Math.Max(1, width - 20 - inset.Left - inset.Right - edge.Left - edge.Right);
+        var available = new Size(innerWidth, double.PositiveInfinity);
+        PanelHeader.Measure(available);
+        FrontMarker.Measure(available);
+        PanelActions.Measure(available);
+        var margin = BoardRegion.Margin;
+        var viewportWidth = Math.Max(1, innerWidth - margin.Left - margin.Right);
+        double viewportHeight;
+        if (boardWidth > 0 && boardHeight > 0)
+        {
+            // Size from the width-fit scale, independent of manual zoom and the previous height.
+            var scale = Math.Clamp((viewportWidth - FitPadding) / boardWidth, .25, 1.3);
+            viewportHeight = boardHeight * scale + FitPadding;
+        }
+        else
+        {
+            EmptyState.Measure(new Size(viewportWidth, double.PositiveInfinity));
+            viewportHeight = EmptyState.DesiredSize.Height + FitPadding;
+        }
+        return Math.Ceiling(20 + inset.Top + inset.Bottom + edge.Top + edge.Bottom +
+            PanelHeader.DesiredSize.Height + FrontMarker.DesiredSize.Height + PanelActions.DesiredSize.Height +
+            margin.Top + margin.Bottom + viewportHeight);
     }
     private Rect CardBounds(bool large)
     {
@@ -64,9 +94,10 @@ public partial class PanelWindow
         radiusFrom = radiusCurrent;
         expanded = !expanded;
         resizeTo = CardBounds(expanded);
-        radiusTo = expanded ? 0 : FloatingRadius();
+        radiusTo = expanded ? 0 : FloatingRadius;
         ExpandButton.Label = expanded ? "还原" : "展开";
         ExpandButton.Icon = expanded ? "restore" : "expand";
+        transitionStarted = Environment.TickCount64;
         var version = ++resizeVersion;
         BeginAnimation(ExpansionProgressProperty, null);
         ExpansionProgress = 0;
@@ -167,7 +198,7 @@ public partial class PanelWindow
             };
             CompositionTarget.Rendering += monitor;
             ToggleExpansion(); await Task.Delay(90);
-            if (!resizeActive || radiusCurrent>=FloatingRadius() || radiusCurrent<=0 || resizeCurrent.Width<=floating.Width-20)
+            if (!resizeActive || radiusCurrent>=FloatingRadius || radiusCurrent<=0 || resizeCurrent.Width<=floating.Width-20)
                 throw new Exception("Expansion did not interpolate geometry and radius.");
             SaveExpansionCapture("expansion-mid");
             var before = resizeCurrent;
@@ -176,7 +207,7 @@ public partial class PanelWindow
             if (Math.Abs(resizeCurrent.X-before.X)>.1 || Math.Abs(radiusCurrent-radiusBefore)>.1)
                 throw new Exception("Expansion reversal jumped.");
             await Task.Delay(500);
-            if (expanded || resizeActive || Math.Abs(MotionRoot.Width-floating.Width)>.1 || Math.Abs(PanelSurface.CornerRadius.TopLeft-FloatingRadius())>.1)
+            if (expanded || resizeActive || Math.Abs(MotionRoot.Width-floating.Width)>.1 || Math.Abs(PanelSurface.CornerRadius.TopLeft-FloatingRadius)>.1)
                 throw new Exception("Restore did not settle.");
             ToggleExpansion(); await Task.Delay(500);
             var work = WorkArea();

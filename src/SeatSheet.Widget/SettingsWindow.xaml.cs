@@ -42,7 +42,7 @@ public partial class SettingsWindow : Window
         if (save)
         {
             try { ApplyRosterDraft(); }
-            catch (Exception ex) { RollCallSettingsMessage.Text = ex.Message; SettingsTabs.SelectedIndex = 1; return; }
+            catch (Exception ex) { RollCallSettingsMessage.Text = ex.Message; SettingsTabs.SelectedIndex = 1; ShowRoster(); return; }
         }
         SettingsTabs.IsEnabled = false;
         SaveButton.IsEnabled = TestButton.IsEnabled = Address.IsEnabled = PanelWidth.IsEnabled = CancelButton.IsEnabled = false;
@@ -87,6 +87,8 @@ public partial class SettingsWindow : Window
         }
         catch (Exception ex)
         {
+            SettingsTabs.SelectedIndex = 0;
+            ConnectionCard.BringIntoView();
             ConnectionState.Text = "连接或保存失败";
             ConnectionState.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(166, 65, 47));
             Message.Text = ex switch
@@ -108,13 +110,13 @@ public partial class SettingsWindow : Window
     private void WidthChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
         if (WidthValue == null || WidthHint == null) return;
-        WidthValue.Text = $"{e.NewValue:0}";
+        WidthValue.Text = $"偏好宽度 {e.NewValue:0}";
         var work = SystemParameters.WorkArea;
         var gap = Math.Clamp(Math.Min(work.Width, work.Height) * .02, 12, 24);
         var available = Math.Max(1, work.Width - gap * 2);
         var minimum = Math.Min(480, available);
         var actual = Math.Clamp(e.NewValue, minimum, Math.Max(minimum, available * .72));
-        WidthHint.Text = $"当前屏幕显示宽度约 {actual:0}，会自动限制以留出桌面空间。展开模式不受此设置影响。";
+        WidthHint.Text = $"当前实际宽度约 {actual:0}，本屏浮动上限约 {Math.Max(minimum, available * .72):0}。展开后使用整个工作区。";
     }
     private void CancelClick(object sender, RoutedEventArgs e) => Close();
     internal void VerifyCancelForSmoke()

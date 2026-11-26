@@ -2,6 +2,7 @@
  Title="SeatSheet 设置" Width="860" Height="650" Style="{StaticResource {x:Type Window}}" ResizeMode="NoResize" WindowStartupLocation="CenterScreen" Background="#F5F7FB" Topmost="True" UseLayoutRounding="True" SnapsToDevicePixels="True">
  <shell:WindowChrome.WindowChrome><shell:WindowChrome CaptionHeight="72" ResizeBorderThickness="0" GlassFrameThickness="0" UseAeroCaptionButtons="False"/></shell:WindowChrome.WindowChrome>
  <Window.Resources>
+  <BooleanToVisibilityConverter x:Key="BoolVisibility"/>
   <Style TargetType="CheckBox">
    <Setter Property="Cursor" Value="Hand"/><Setter Property="Foreground" Value="{StaticResource Ink}"/>
    <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="CheckBox"><Grid Background="Transparent"><Grid.ColumnDefinitions><ColumnDefinition Width="16"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><Border x:Name="CheckFrame" Width="16" Height="16" VerticalAlignment="Center" Background="White" BorderBrush="#A5B2C6" BorderThickness="1" CornerRadius="4"><Path x:Name="Tick" Data="M3 7 L6 10 L12 4" Stroke="White" StrokeThickness="1.7" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Visibility="Collapsed"/></Border><ContentPresenter x:Name="CheckContent" Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center" RecognizesAccessKey="True"/></Grid><ControlTemplate.Triggers><Trigger Property="HasContent" Value="False"><Setter TargetName="CheckContent" Property="Margin" Value="0"/></Trigger><Trigger Property="IsChecked" Value="True"><Setter TargetName="CheckFrame" Property="Background" Value="#245AE3"/><Setter TargetName="CheckFrame" Property="BorderBrush" Value="#245AE3"/><Setter TargetName="Tick" Property="Visibility" Value="Visible"/></Trigger><Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="CheckFrame" Property="BorderBrush" Value="#245AE3"/><Setter TargetName="CheckFrame" Property="BorderThickness" Value="2"/></Trigger><Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.45"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
@@ -42,7 +43,7 @@
      </ToggleButton>
      <ContentPresenter Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" Margin="12,10,30,10" IsHitTestVisible="False"/>
      <Popup x:Name="PART_Popup" IsOpen="{TemplateBinding IsDropDownOpen}" Placement="Bottom" AllowsTransparency="True" Focusable="False" PopupAnimation="None">
-      <Border Background="White" BorderBrush="#DCE3EF" BorderThickness="1" CornerRadius="7" MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}" Padding="4"><ScrollViewer MaxHeight="200"><ItemsPresenter/></ScrollViewer></Border>
+      <Border Background="White" BorderBrush="#DCE3EF" BorderThickness="1" CornerRadius="7" MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}" Padding="4"><ScrollViewer PanningMode="VerticalOnly" MaxHeight="200"><ItemsPresenter/></ScrollViewer></Border>
      </Popup>
     </Grid>
    </ControlTemplate></Setter.Value></Setter>
@@ -75,7 +76,7 @@
     <Style TargetType="TabControl"><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="TabControl"><Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions><StackPanel Orientation="Horizontal" IsItemsHost="True" Margin="0,0,0,16"/><Grid x:Name="TabMotionStage" Grid.Row="1" ClipToBounds="True"><ContentPresenter x:Name="TabMotionContent"/></Grid></Grid></ControlTemplate></Setter.Value></Setter></Style>
    </TabControl.Resources>
    <TabItem Header="常规">
-  <ScrollViewer x:Name="GeneralSettingsScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+  <ScrollViewer x:Name="GeneralSettingsScroll" PanningMode="VerticalOnly" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
    <StackPanel>
     <Border Tag="SettingsMotionCard" x:Name="ConnectionCard" Background="White" BorderBrush="#E1E7F0" BorderThickness="1" CornerRadius="12" Padding="18" Margin="0,0,0,14">
      <StackPanel>
@@ -143,10 +144,28 @@
    </TabItem>
    <TabItem Header="随机点名">
     <Grid>
-     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+     <Grid x:Name="RosterPage">
+      <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+      <Grid Tag="SettingsMotionCard" Grid.Row="0" Margin="0,0,0,8">
+       <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+       <StackPanel Margin="0,0,16,0"><TextBlock Text="参与名单" FontSize="16" FontWeight="SemiBold"/><TextBlock x:Name="RosterSummary" Text="尚未加载座位表" FontSize="12" Foreground="{StaticResource Muted}" Margin="0,5,0,0" TextWrapping="Wrap"/></StackPanel>
+       <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center"><ui:IconButton Icon="refresh" Label="更新名单" Click="RefreshRosterClick" Padding="10,8"/><Button Content="重置本轮" Click="ResetRoundClick" Padding="12,8" Margin="6,0,0,0"/><Button x:Name="OptionsButton" Content="点名选项" Click="ShowOptionsClick" Padding="10,8" Margin="6,0,0,0"/></StackPanel>
+      </Grid>
+      <DataGrid Tag="SettingsMotionCard" Grid.Row="1" x:Name="ParticipantGrid" ScrollViewer.PanningMode="VerticalOnly" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False" HeadersVisibility="Column" GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#E1E7F0" RowHeaderWidth="0" BorderBrush="#E1E7F0" BorderThickness="1" Background="White" AlternatingRowBackground="#F8FAFD" RowHeight="36" EnableRowVirtualization="True" EnableColumnVirtualization="True" SelectionMode="Single" FontSize="12">
+       <DataGrid.Columns>
+        <DataGridTextColumn Header="姓名" Binding="{Binding Name}" ElementStyle="{StaticResource RosterText}" IsReadOnly="True" Width="2*"/>
+        <DataGridTextColumn Header="学号" Binding="{Binding StudentNo}" ElementStyle="{StaticResource RosterText}" IsReadOnly="True" Width="*"/>
+        <DataGridTextColumn Header="座位" Binding="{Binding SeatLabel}" ElementStyle="{StaticResource RosterText}" IsReadOnly="True" Width="1.5*"/>
+        <DataGridTextColumn Header="权重" Binding="{Binding Weight, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" ElementStyle="{StaticResource RosterText}" EditingElementStyle="{StaticResource RosterEditor}" Width="*"/>
+        <DataGridCheckBoxColumn Header="缺席" Binding="{Binding Absent, UpdateSourceTrigger=PropertyChanged}" ElementStyle="{StaticResource RosterCheck}" EditingElementStyle="{StaticResource RosterCheckEdit}" Width="*"/>
+       </DataGrid.Columns>
+      </DataGrid>
+      <TextBlock Tag="SettingsMotionCard" Grid.Row="2" x:Name="RollCallSettingsMessage" Text="空座不加入名单。权重为 0–100 的整数，0 或缺席均不参与；修改后点击保存设置。" TextWrapping="Wrap" Foreground="{StaticResource Muted}" FontSize="11" Margin="0,10,0,0"/>
+     </Grid>
+     <ScrollViewer x:Name="RollCallOptionsPage" Visibility="Collapsed" PanningMode="VerticalOnly" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
      <Border Tag="SettingsMotionCard" Background="White" BorderBrush="#E1E7F0" BorderThickness="1" CornerRadius="12" Padding="18" Margin="0,0,0,12">
       <StackPanel>
-       <TextBlock Text="点名与通知" FontSize="16" FontWeight="SemiBold"/>
+       <DockPanel><Button x:Name="ReturnToRosterButton" DockPanel.Dock="Right" Content="返回名单" HorizontalAlignment="Right" Click="ShowRosterClick"/><TextBlock Text="点名选项" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center"/></DockPanel>
        <Grid Margin="0,12,0,0">
         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="24"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
         <StackPanel><TextBlock Text="结果显示位置" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,0,0,6"/>
@@ -159,33 +178,20 @@
         <CheckBox x:Name="DisableBreakOption" Margin="0,0,0,6" Checked="BreakOptionChanged" Unchecked="BreakOptionChanged"><TextBlock Text="课间禁用点名" FontSize="12"/></CheckBox>
        </WrapPanel>
        <TextBlock Text="悬浮窗可拖动；课间限制由 ClassIsland 判断，未运行或状态不可用时允许点名。" Foreground="{StaticResource Muted}" FontSize="11" TextWrapping="Wrap"/>
-       <Grid Margin="0,8,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock x:Name="LessonStateText" Text="未启用课间限制" FontSize="11" Foreground="{StaticResource Muted}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,12,0"/><Button x:Name="CheckLessonButton" Grid.Column="1" Content="检查课程状态" Click="CheckLessonClick" Padding="10,6" IsEnabled="False"/></Grid>
+       <Grid Margin="0,8,0,0" Visibility="{Binding IsChecked, ElementName=DisableBreakOption, Converter={StaticResource BoolVisibility}}"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock x:Name="LessonStateText" Text="未启用课间限制" FontSize="11" Foreground="{StaticResource Muted}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,12,0"/><Button x:Name="CheckLessonButton" Grid.Column="1" Content="检查课程状态" Click="CheckLessonClick" Padding="10,6" IsEnabled="False"/></Grid>
        <Grid Margin="0,14,0,0">
+        <Grid.Style><Style TargetType="Grid"><Style.Triggers><DataTrigger Binding="{Binding SelectedIndex, ElementName=RollCallOutput}" Value="0"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger></Style.Triggers></Style></Grid.Style>
         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
         <StackPanel VerticalAlignment="Center" Margin="0,0,16,0"><TextBlock x:Name="PluginConnection" Text="尚未连接" FontSize="12" Foreground="{StaticResource Muted}"/><TextBlock Text="通知失败会回退到本软件显示，重发不会重新抽人。" TextWrapping="Wrap" Foreground="{StaticResource Muted}" FontSize="11" Margin="0,5,0,0"/></StackPanel>
         <ui:IconButton Grid.Column="1" x:Name="ProbePluginButton" Icon="refresh" Label="检查插件" Click="ProbePluginClick" Padding="12,8" VerticalAlignment="Center"/>
        </Grid>
       </StackPanel>
      </Border>
-     <Grid Tag="SettingsMotionCard" Grid.Row="1" Margin="0,0,0,8">
-      <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-      <StackPanel Margin="0,0,16,0"><TextBlock Text="参与名单" FontSize="16" FontWeight="SemiBold"/><TextBlock x:Name="RosterSummary" Text="尚未加载座位表" FontSize="12" Foreground="{StaticResource Muted}" Margin="0,5,0,0" TextWrapping="Wrap"/></StackPanel>
-      <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center"><ui:IconButton Icon="refresh" Label="更新名单" Click="RefreshRosterClick" Padding="12,8"/><Button Content="重置本轮" Click="ResetRoundClick" Padding="12,8" Margin="8,0,0,0"/></StackPanel>
-     </Grid>
-     <DataGrid Tag="SettingsMotionCard" Grid.Row="2" x:Name="ParticipantGrid" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False" HeadersVisibility="Column" GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#E1E7F0" RowHeaderWidth="0" BorderBrush="#E1E7F0" BorderThickness="1" Background="White" AlternatingRowBackground="#F8FAFD" RowHeight="36" EnableRowVirtualization="True" EnableColumnVirtualization="True" SelectionMode="Single" FontSize="12">
-      <DataGrid.Columns>
-       <DataGridTextColumn Header="姓名" Binding="{Binding Name}" ElementStyle="{StaticResource RosterText}" IsReadOnly="True" Width="2*"/>
-       <DataGridTextColumn Header="学号" Binding="{Binding StudentNo}" ElementStyle="{StaticResource RosterText}" IsReadOnly="True" Width="*"/>
-       <DataGridTextColumn Header="座位" Binding="{Binding SeatLabel}" ElementStyle="{StaticResource RosterText}" IsReadOnly="True" Width="1.5*"/>
-       <DataGridTextColumn Header="权重" Binding="{Binding Weight, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" ElementStyle="{StaticResource RosterText}" EditingElementStyle="{StaticResource RosterEditor}" Width="*"/>
-       <DataGridCheckBoxColumn Header="缺席" Binding="{Binding Absent, UpdateSourceTrigger=PropertyChanged}" ElementStyle="{StaticResource RosterCheck}" EditingElementStyle="{StaticResource RosterCheckEdit}" Width="*"/>
-      </DataGrid.Columns>
-     </DataGrid>
-     <TextBlock Tag="SettingsMotionCard" Grid.Row="3" x:Name="RollCallSettingsMessage" Text="空座不加入名单。权重为 0–100 的整数，0 或缺席均不参与；修改后点击保存设置。" TextWrapping="Wrap" Foreground="{StaticResource Muted}" FontSize="11" Margin="0,10,0,0"/>
+     </ScrollViewer>
     </Grid>
    </TabItem>
    <TabItem Header="关于">
-    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+    <ScrollViewer PanningMode="VerticalOnly" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
      <StackPanel>
       <Border Tag="SettingsMotionCard" Background="White" BorderBrush="#E1E7F0" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14">
        <StackPanel><TextBlock Text="SeatSheet 桌面座位表" FontSize="20" FontWeight="SemiBold"/><TextBlock x:Name="AboutVersion" FontSize="14" Foreground="#245AE3" Margin="0,8,0,0"/><TextBlock Text="查看班级座位安排、管理随机点名，并按需联动 ClassIsland。" FontSize="12" Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,12,0,0"/></StackPanel>

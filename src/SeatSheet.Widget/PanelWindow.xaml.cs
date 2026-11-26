@@ -28,6 +28,8 @@ public partial class PanelWindow : Window
     private bool connectionOnline;
     private bool motionActive;
     private int motionVersion;
+    private long transitionStarted;
+
     private readonly DispatcherTimer geometryTimer = new() { Interval = TimeSpan.FromSeconds(2) };
     public PanelWindow()
     {
@@ -35,7 +37,16 @@ public partial class PanelWindow : Window
         InitializeRollCallAvailability();
         SourceInitialized += (_, _) => Native.MakeToolWindow(new WindowInteropHelper(this).Handle);
         Closing += OnClosing;
-        geometryTimer.Tick += (_, _) => { if (IsVisible && !motionActive && !resizeActive) Position(); };
+        geometryTimer.Tick += (_, _) =>
+        {
+            // A suspended renderer may never deliver the animation's Completed event.
+            if (Environment.TickCount64 - transitionStarted > 1500)
+            {
+                if (motionActive) FinishMotion(!closing, motionVersion);
+                else if (resizeActive) FinishExpansion();
+            }
+            if (IsVisible && !motionActive && !resizeActive) Position();
+        };
         geometryTimer.Start();
         cached = App.IsSmoke ? null : LocalStore.ReadCache(App.Settings.ServerUrl);
         if (cached != null)
@@ -81,7 +92,7 @@ public partial class PanelWindow : Window
         MotionRoot.VerticalAlignment = VerticalAlignment.Top;
         MotionRoot.Margin = new Thickness(rect.Left - work.Left, rect.Top - work.Top, 0, 0);
         PanelSurface.Margin = expanded ? new Thickness(0) : new Thickness(10);
-        PanelSurface.CornerRadius = new CornerRadius(expanded ? 0 : FloatingRadius());
+        PanelSurface.CornerRadius = new CornerRadius(expanded ? 0 : FloatingRadius);
         PanelShadow.CornerRadius = PanelSurface.CornerRadius;
         PanelShadow.Visibility = expanded ? Visibility.Collapsed : Visibility.Visible;
     }
@@ -89,6 +100,7 @@ public partial class PanelWindow : Window
     {
         var version = ++motionVersion;
         motionActive = true;
+        transitionStarted = Environment.TickCount64;
         MotionRoot.IsHitTestVisible = false;
         // Cache the stable card only during motion, then restore sharp text rendering.
         MotionRoot.CacheMode = new BitmapCache();
@@ -109,30 +121,31 @@ public partial class PanelWindow : Window
         MotionScale.ScaleX = MotionScale.ScaleY = scale;
         MotionRoot.Opacity = opacity;
         var slide = MotionAnimation(x, targetX, duration, spline);
-        slide.Completed += async (_, _) =>
-        {
-            if (version != motionVersion) return;
-            MotionSlide.BeginAnimation(TranslateTransform.XProperty, null);
-            MotionScale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
-            MotionScale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
-            MotionRoot.BeginAnimation(OpacityProperty, null);
-            MotionSlide.X = targetX;
-            MotionScale.ScaleX = MotionScale.ScaleY = targetScale;
-            MotionRoot.Opacity = targetOpacity;
-            motionActive = false;
-            MotionRoot.CacheMode = null;
-            MotionRoot.IsHitTestVisible = opening;
-            if (!opening) { Hide(); closing = false; }
-            else
-            {
-                await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ContextIdle);
-                if (version == motionVersion && !closing && !App.IsMotionQa) await Refresh();
-            }
-        };
+        slide.Completed += (_, _) => FinishMotion(opening, version);
         MotionSlide.BeginAnimation(TranslateTransform.XProperty, slide);
         MotionScale.BeginAnimation(ScaleTransform.ScaleXProperty, MotionAnimation(scale, targetScale, duration, spline));
         MotionScale.BeginAnimation(ScaleTransform.ScaleYProperty, MotionAnimation(scale, targetScale, duration, spline));
         MotionRoot.BeginAnimation(OpacityProperty, MotionAnimation(opacity, targetOpacity, duration, spline));
+    }
+    private void FinishMotion(bool opening, int version)
+    {
+        if (!motionActive || version != motionVersion) return;
+        MotionSlide.BeginAnimation(TranslateTransform.XProperty, null);
+        MotionScale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+        MotionScale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+        MotionRoot.BeginAnimation(OpacityProperty, null);
+        MotionSlide.X = opening ? 0 : 24;
+        MotionScale.ScaleX = MotionScale.ScaleY = opening ? 1 : .985;
+        MotionRoot.Opacity = opening ? 1 : 0;
+        motionActive = false;
+        MotionRoot.CacheMode = null;
+        MotionRoot.IsHitTestVisible = opening;
+        if (!opening) { Hide(); closing = false; }
+        else if (!App.IsMotionQa)
+            Dispatcher.InvokeAsync(async () =>
+            {
+                if (version == motionVersion && !closing) await Refresh();
+            }, DispatcherPriority.ContextIdle);
     }
     private static DoubleAnimationUsingKeyFrames MotionAnimation(double from, double to, TimeSpan duration, KeySpline spline)
     {
@@ -200,7 +213,7 @@ public partial class PanelWindow : Window
     private void Status(string message, bool online)
     {
         connectionOnline = online;
-        connectionSummary = online ? "已连接 · 打开面板时自动刷新" : string.IsNullOrWhiteSpace(App.Settings.ServerUrl) ? "尚未配置 · 请打开设置" : cached != null ? "离线 · 使用最近的座位表" : "未连接 · 请检查设置";
+        connectionSummary = online ? "已连接" : string.IsNullOrWhiteSpace(App.Settings.ServerUrl) ? "尚未配置 · 请打开设置" : cached != null ? "离线 · 使用最近的座位表" : "未连接 · 请检查设置";
         ConnectionDetails.Text = message;
         RestoreConnectionSummary();
         if (cached != null) UpdatePlanMetadata(cached.Plan);
@@ -212,7 +225,7 @@ public partial class PanelWindow : Window
     }
     private void UpdatePlanMetadata(SeatPlan plan)
     {
-        PlanStats.Text = $"{plan.Rows} 排 × {plan.Columns} 列   ·   {plan.Seats.Count(s => !string.IsNullOrWhiteSpace(s.Name) || !string.IsNullOrWhiteSpace(s.StudentNo))} 人已安排";
+        PlanStats.Text = $"{plan.Rows} 排 × {plan.Columns} 列   ·   {plan.Seats.Count(s => !string.IsNullOrWhiteSpace(s.Name) || !string.IsNullOrWhiteSpace(s.StudentNo))} 人";
         var updated = plan.UpdatedAt == default ? "" : $"座位更新 {plan.UpdatedAt.ToLocalTime():MM-dd HH:mm}";
         var fetched = cached?.FetchedAt is { } time && time != default ? $"获取于 {time.ToLocalTime():MM-dd HH:mm}" : "";
         UpdatedLabel.Text = string.Join(" · ", new[] {updated, fetched}.Where(s => s.Length > 0));
@@ -247,7 +260,7 @@ public partial class PanelWindow : Window
             var content = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
             content.Children.Add(Label(string.IsNullOrWhiteSpace(seat?.Name) ? "空座" : seat.Name, plan.ShowStudentNo ? 23 : 27, occupied ? "#18243B" : "#A0AABD"));
             if (plan.ShowStudentNo) content.Children.Add(new TextBlock
-            { Text = string.IsNullOrWhiteSpace(seat?.StudentNo) ? "—" : seat.StudentNo, FontSize = 12, Foreground = Brush("#788397"),
+            { Text = string.IsNullOrWhiteSpace(seat?.StudentNo) ? "—" : seat.StudentNo, FontSize = 16, Foreground = Brush("#596A82"),
               TextAlignment = TextAlignment.Center, Margin = new Thickness(0, 6, 0, 0), TextTrimming = TextTrimming.CharacterEllipsis });
             var card = new Border { Background = Brush(occupied ? "#FFFFFF" : "#EFF2F7"), BorderBrush = Brush("#DFE5EF"),
                 BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(9), Margin = new Thickness(5), Padding = new Thickness(7), Child = content,
@@ -257,26 +270,31 @@ public partial class PanelWindow : Window
         }
         foreach (var aisle in aisles)
         {
-            var marker = new Border { BorderBrush = Brush("#D9E1EC"), BorderThickness = new Thickness(1, 0, 1, 0), Margin = new Thickness(5, 10, 5, 10), Child = Label("过\n道", 11, "#8794A8") };
+            var marker = new Border { BorderBrush = Brush("#D9E1EC"), BorderThickness = new Thickness(1, 0, 1, 0), Margin = new Thickness(5, 10, 5, 10), Child = Label("过\n道", 14, "#8794A8") };
             Grid.SetColumn(marker, aisle + 2 + aisles.Count(a => a < aisle)); Grid.SetRowSpan(marker, plan.Rows);
             Board.Children.Add(marker);
         }
         var doorColumn = plan.DoorSide == "left" ? 0 : Board.ColumnDefinitions.Count - 1;
         var doors = new Grid();
-        var front = new Border { Child = Label("前门", 12, "#536581"), Background = Brush("#E6ECF6"), CornerRadius = new CornerRadius(6), Padding = new Thickness(3, 12, 3, 12), VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(4, 5, 4, 0) };
-        var back = new Border { Child = Label("后门", 12, "#536581"), Background = Brush("#E6ECF6"), CornerRadius = new CornerRadius(6), Padding = new Thickness(3, 12, 3, 12), VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(4, 0, 4, 5) };
+        var front = new Border { Child = Label("前门", 15, "#536581"), Background = Brush("#E6ECF6"), CornerRadius = new CornerRadius(6), Padding = new Thickness(3, 12, 3, 12), VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(4, 5, 4, 0) };
+        var back = new Border { Child = Label("后门", 15, "#536581"), Background = Brush("#E6ECF6"), CornerRadius = new CornerRadius(6), Padding = new Thickness(3, 12, 3, 12), VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(4, 0, 4, 5) };
         doors.Children.Add(front); doors.Children.Add(back);
         Grid.SetColumn(doors, doorColumn); Grid.SetRowSpan(doors, plan.Rows); Board.Children.Add(doors);
         boardWidth = 116 + plan.Columns * 148 + aisles.Length * 30;
         boardHeight = plan.Rows * 98;
         Board.Width = boardWidth; Board.Height = boardHeight;
         SetBoardScale(BoardScale.ScaleX);
-        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(ApplyFit));
+        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
+        {
+            if (IsVisible && !resizeActive) Position();
+            ApplyFit();
+        }));
     }
+    private const double FitPadding = 20;
     private void ApplyFit()
     {
         if (!fit || boardWidth <= 0 || BoardScroll.ActualWidth <= 0) return;
-        var scale = Math.Clamp(Math.Min((BoardScroll.ActualWidth - 20) / boardWidth, (BoardScroll.ActualHeight - 20) / boardHeight), 0.25, 1.3);
+        var scale = Math.Clamp(Math.Min((BoardScroll.ActualWidth - FitPadding) / boardWidth, (BoardScroll.ActualHeight - FitPadding) / boardHeight), 0.25, 1.3);
         SetBoardScale(scale);
     }
     private void SetBoardScale(double scale)
@@ -294,7 +312,7 @@ public partial class PanelWindow : Window
             ApplyFloatingRollCall();
             cached = LocalStore.ReadCache(App.Settings.ServerUrl);
             if (cached != null) Render(cached.Plan);
-            else { Board.Children.Clear(); PlanTitle.Text = "座位表"; PlanStats.Text = "连接你的班级，随时查看座位"; EmptyState.Visibility = Visibility.Visible; EmptyTitle.Text = "正在获取座位表…"; UpdatedLabel.Text = ""; }
+            else { boardWidth = boardHeight = BoardExtent.Width = BoardExtent.Height = 0; Board.Children.Clear(); PlanTitle.Text = "座位表"; PlanStats.Text = "连接你的班级，随时查看座位"; EmptyState.Visibility = Visibility.Visible; EmptyTitle.Text = "正在获取座位表…"; UpdatedLabel.Visibility = Visibility.Collapsed; }
             if (resizeActive) FinishExpansion();
             Position();
             await Refresh();
@@ -354,8 +372,18 @@ public partial class PanelWindow : Window
             await Task.Delay(430);
             if (!IsVisible || Math.Abs(MotionScale.ScaleX - 1) > 0.01 || Math.Abs(MotionRoot.Opacity - 1) > 0.01)
                 throw new Exception("Panel could not reopen after hiding.");
+            Collapse();
+            // Remove the completion clock, as if rendering stopped midway through closing.
+            MotionSlide.BeginAnimation(TranslateTransform.XProperty, null);
+            await Task.Delay(4200);
+            if (IsVisible || motionActive || closing) throw new Exception("Interrupted collapse did not settle.");
+            Open();
+            MotionSlide.BeginAnimation(TranslateTransform.XProperty, null);
+            await Task.Delay(4200);
+            if (!IsVisible || motionActive || !MotionRoot.IsHitTestVisible || MotionRoot.Opacity != 1)
+                throw new Exception("Interrupted opening did not restore pointer input.");
             File.WriteAllText(Path.Combine(App.SmokeFolder!, "motion-result.json"), JsonSerializer.Serialize(new
-            { passed = true, checks = new[] { "close reversal continuity", "open reversal continuity", "settled visibility/opacity", "bitmap cache released", "native window remains fixed", "collapse hides", "reopen restores scale" } }, LocalStore.Json));
+            { passed = true, checks = new[] { "close reversal continuity", "open reversal continuity", "settled visibility/opacity", "bitmap cache released", "native window remains fixed", "collapse hides", "reopen restores scale", "interrupted close and open recover" } }, LocalStore.Json));
             Application.Current.Shutdown();
         }
         catch (Exception ex)

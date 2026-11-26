@@ -28,6 +28,22 @@ public partial class SettingsWindow
         Loaded += (_, _) => { UpdatePluginStatus(); pluginStatusTimer.Start(); };
         Closed += (_, _) => pluginStatusTimer.Stop();
     }
+    private void ShowOptionsClick(object sender, RoutedEventArgs e)
+    {
+        RosterPage.Visibility = Visibility.Collapsed;
+        RollCallOptionsPage.Visibility = Visibility.Visible;
+        RollCallOutput.Focus();
+    }
+    private void ShowRosterClick(object sender, RoutedEventArgs e)
+    {
+        ShowRoster();
+        OptionsButton.Focus();
+    }
+    private void ShowRoster()
+    {
+        RollCallOptionsPage.Visibility = Visibility.Collapsed;
+        RosterPage.Visibility = Visibility.Visible;
+    }
     private void OutputSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         draftProbeStatus = null;
@@ -125,7 +141,26 @@ public partial class SettingsWindow
     {
         if (!App.IsSmoke) throw new InvalidOperationException("Requires isolated QA.");
         var before = System.Text.Json.JsonSerializer.Serialize(App.Settings.RollCall);
-        participants[0].Weight = 3;
+        if (save)
+        {
+            // 1080p at 200%, with taskbar and window margins.
+            Width = 860;
+            Height = 444;
+            UpdateLayout();
+            var weightColumn = ParticipantGrid.Columns.OfType<DataGridBoundColumn>()
+                .Single(column => Equals(column.Header, "权重"));
+            var student = participants[0];
+            ParticipantGrid.ScrollIntoView(student, weightColumn);
+            ParticipantGrid.UpdateLayout();
+            ParticipantGrid.CurrentCell = new DataGridCellInfo(student, weightColumn);
+            if (ParticipantGrid.ActualHeight < ParticipantGrid.RowHeight * 3 + 38 ||
+                !ParticipantGrid.BeginEdit() || weightColumn.GetCellContent(student) is not TextBox editor)
+                throw new InvalidOperationException("The compact roster does not expose an editable weight cell.");
+            editor.Text = "3";
+            if (!ParticipantGrid.CommitEdit(DataGridEditingUnit.Cell, true) || student.Weight != 3)
+                throw new InvalidOperationException("The visible weight editor did not update the roster draft.");
+        }
+        else participants[0].Weight = 3;
         participants[1].Absent = true;
         NoRepeatOption.IsChecked = true;
         FloatingRollCallOption.IsChecked = true;
